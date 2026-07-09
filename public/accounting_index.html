@@ -1,0 +1,3207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家记账 — 公司财务</title>
+<script src="/vue.min.js?v=260705"></script>
+<script src="/axios.min.js?v=260705"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f5f6fa;color:#333}
+/* ========== 登录 ========== */
+.login-box{max-width:400px;margin:80px auto;padding:40px;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.login-box h2{text-align:center;margin-bottom:24px;font-size:24px;color:#e74c3c}
+.login-box input{width:100%;padding:12px;margin-bottom:16px;border:1px solid #ddd;border-radius:8px;font-size:15px}
+.login-box button{width:100%;padding:12px;background:#e74c3c;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer}
+.login-box .err{color:#e74c3c;text-align:center;margin-top:8px}
+/* ========== 导航 ========== */
+.nav{background:#fff;padding:0 16px;height:56px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 4px rgba(0,0,0,.06);position:sticky;top:0;z-index:100}
+.nav h1{font-size:17px;color:#e74c3c;white-space:nowrap}
+.nav .tabs{display:flex;gap:2px;overflow-x:auto}
+.nav .tabs button{padding:8px 12px;border:none;background:transparent;font-size:13px;cursor:pointer;border-radius:6px;color:#666;white-space:nowrap;transition:all .2s}
+.nav .tabs button.active{background:#e74c3c;color:#fff}
+.nav .right{display:flex;align-items:center;gap:12px;white-space:nowrap}
+.nav .right span{font-size:13px;color:#999}
+.nav .right button{padding:6px 14px;border:1px solid #ddd;background:#fff;border-radius:6px;font-size:13px;cursor:pointer}
+.main{padding:20px 16px;max-width:1300px;margin:0 auto}
+/* ========== 通用 ========== */
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+@media(max-width:768px){.cards{grid-template-columns:repeat(2,1fr)}}
+.card{background:#fff;padding:20px;border-radius:12px;box-shadow:0 1px 8px rgba(0,0,0,.04)}
+.card .label{font-size:13px;color:#999;margin-bottom:8px}
+.card .value{font-size:26px;font-weight:700}
+.card .value.income{color:#27ae60}
+.card .value.expense{color:#e74c3c}
+.card .value.net{color:#3498db}
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+.toolbar .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.toolbar select,.toolbar input[type=text],.toolbar input[type=date],.toolbar input[type=number]{padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px}
+.btn{padding:8px 18px;border:none;border-radius:6px;font-size:13px;cursor:pointer;transition:all .2s;white-space:nowrap}
+.btn-primary{background:#e74c3c;color:#fff}
+.btn-primary:hover{background:#c0392b}
+.btn-success{background:#27ae60;color:#fff}
+.btn-success:hover{background:#219a52}
+.btn-warning{background:#f39c12;color:#fff}
+.btn-outline{border:1px solid #ddd;background:#fff}
+.btn-outline:hover{background:#f5f5f5}
+.btn-danger{border:1px solid #e74c3c;color:#e74c3c;background:#fff}
+.btn-sm{padding:4px 10px;font-size:12px}
+.btn-xs{padding:2px 8px;font-size:11px}
+.panel{background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 1px 8px rgba(0,0,0,.04)}
+.panel h3{font-size:16px;margin-bottom:16px;color:#444}
+/* ========== 表格 ========== */
+table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.04)}
+th{background:#fafafa;padding:10px 12px;text-align:left;font-weight:600;color:#666;border-bottom:2px solid #eee;white-space:nowrap}
+td{padding:9px 12px;border-bottom:1px solid #f5f5f5}
+tr:hover{background:#f9f9f9}
+.tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.tag.draft{background:#fff3cd;color:#856404}
+.tag.audited{background:#d4edda;color:#155724}
+.tag.posted{background:#cce5ff;color:#004085}
+.tag.reversed{background:#f8d7da;color:#721c24}
+.tag.income{color:#27ae60}
+.tag.expense{color:#e74c3c}
+.balance-ok{color:#27ae60;font-weight:700}
+.balance-err{color:#e74c3c;font-weight:700}
+.reversal-row{background:#fff5f5 !important}
+.reversal-row td{color:#c0392b}
+.pagination{display:flex;justify-content:center;align-items:center;gap:16px;padding:16px 0}
+.pagination button{padding:6px 16px;border:1px solid #ddd;background:#fff;border-radius:6px;cursor:pointer}
+.pagination button:disabled{opacity:.4;cursor:not-allowed}
+.pagination span{font-size:13px;color:#999}
+.loading{text-align:center;padding:40px;color:#999}
+.empty{text-align:center;padding:40px;color:#ccc;font-size:14px}
+.text-right{text-align:right}
+.text-center{text-align:center}
+.mono{font-family:"SF Mono","Consolas",monospace}
+.row-red{color:#c0392b}
+.row-bg-red{background:#fff5f5 !important}
+/* ========== 合计行 ========== */
+.totals-row{background:#fdf8e8 !important;font-weight:700;font-size:13px}
+.totals-row td{border-top:2px solid #f39c12;border-bottom:2px solid #f39c12}
+.totals-label{color:#856404}
+/* 期初 / 过次页 */
+.interim-row{background:#f0f8ff !important;font-weight:600;font-size:12px;color:#555}
+.interim-row td{border-top:1px dashed #aaa;border-bottom:1px dashed #aaa}
+/* ========== 打印样式 ========== */
+@media print {
+  body{background:#fff;font-size:12px}
+  .nav,.btn,.toolbar,.pagination,.form-actions,.no-print{display:none !important}
+  .main{padding:0;max-width:100%}
+  .card,.panel{box-shadow:none;border:1px solid #ddd;break-inside:avoid;page-break-inside:avoid}
+  table{box-shadow:none}
+  th{background:#eee}
+  .print-header{display:block !important;text-align:center;margin-bottom:16px}
+  .print-header h2{font-size:18px;margin-bottom:4px}
+  .print-header p{font-size:12px;color:#666;margin:2px 0}
+  @page{size:A4;margin:12mm}
+}
+.print-header{display:none}
+/* ========== 弹窗 ========== */
+.modal-mask,.modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:200}
+.modal{background:#fff;border-radius:12px;padding:24px;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.modal h3{margin-bottom:16px;font-size:18px}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:13px;color:#666;margin-bottom:4px}
+.form-group input,.form-group select{width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px}
+.form-row{display:flex;gap:16px}
+.form-row .form-group{flex:1}
+.form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.entry-header{display:flex;gap:12px;padding:8px 0;font-weight:600;font-size:12px;color:#999;border-bottom:1px solid #eee}
+.entry-header span,.entry-row span{flex:1}
+.entry-header span:first-child,.entry-row span:first-child{flex:2}
+.entry-row{display:flex;gap:12px;align-items:center;padding:6px 0;border-bottom:1px solid #f5f5f5}
+.entry-row select,.entry-row input{flex:1;padding:6px 8px;border:1px solid #eee;border-radius:4px;font-size:13px}
+.entry-row select{flex:2}
+/* 报表分段 */
+.statement-section{margin-bottom:16px}
+.statement-section h4{font-size:14px;font-weight:700;margin-bottom:8px;color:#444;padding:6px 12px;background:#fafafa;border-radius:4px}
+.total-row{background:#fdf8e8;font-weight:700}
+.total-row td{border-top:2px solid #f39c12}
+/* 图表 */
+.chart-bar{display:flex;align-items:flex-end;gap:8px;height:160px;overflow-x:auto}
+.col{display:flex;flex-direction:column;align-items:center;min-width:40px}
+.bar-group{display:flex;gap:3px;align-items:flex-end;height:120px}
+.bar{width:14px;border-radius:3px 3px 0 0;min-height:2px}
+.bar.income{background:#27ae60}
+.bar.expense{background:#e74c3c}
+.month-label{font-size:10px;color:#999;margin-top:4px;writing-mode:vertical-lr}
+/* 科目表 */
+.subject-table{font-size:13px}
+.subject-table .lvl1{font-weight:600}
+/* 卡片内迷你值 */
+.mini-stat{display:inline-block;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;margin-right:8px}
+.mini-stat.income-bg{background:#e8f5e9;color:#27ae60}
+.mini-stat.expense-bg{background:#ffebee;color:#e74c3c}
+.mini-stat.net-bg{background:#e3f2fd;color:#3498db}
+/* 智能推荐下拉 */
+.suggest-wrap{position:relative;flex:1}
+.suggest-list{position:absolute;top:100%;left:0;right:0;background:#1e293b;border:1px solid #334155;border-radius:0 0 8px 8px;z-index:1000;max-height:240px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.suggest-item{padding:8px 12px;cursor:pointer;border-bottom:1px solid #1e293b;display:flex;align-items:center;font-size:13px;transition:background .15s}
+.suggest-item:hover{background:#2d3a50}
+.suggest-item .sug-code{color:#fbbf24;font-weight:600;margin-right:10px;min-width:60px}
+.suggest-item .sug-name{color:#e2e8f0;flex:1}
+.suggest-item .sug-score{color:#64748b;font-size:11px;margin-left:8px}
+.suggest-item .sug-by{font-size:10px;color:#475569;margin-left:6px}
+.suggest-item .sug-summary{font-size:11px;color:#64748b;margin-left:8px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ===== 移动端响应式 ===== */
+@media (max-width: 768px) {
+  body { font-size: 14px; }
+  .container { padding: 10px; max-width: 100%; }
+  .header { flex-direction: column; gap: 8px; text-align: center; }
+  .header nav { flex-wrap: wrap; justify-content: center; gap: 4px; }
+  .header nav button, .header nav .btn { font-size: 12px; padding: 6px 10px; }
+  .tab-bar { overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+  .tab-bar button { font-size: 12px; padding: 8px 12px; flex-shrink: 0; }
+  
+  /* 表格横向滚动 */
+  table { font-size: 12px; display: block; overflow-x: auto; white-space: nowrap; }
+  th, td { padding: 4px 8px; }
+  
+  /* 表单适配 */
+  .form-group { flex-direction: column; }
+  .form-group label { margin-bottom: 4px; min-width: auto; }
+  .form-row { flex-direction: column; gap: 8px; }
+  
+  /* 弹窗适配 */
+  .modal { width: 95vw !important; max-width: 95vw; margin: 10px; }
+  .modal-mask, /* ========== 表单 ========== */
+.form-group { margin-bottom: 12px; }
+.form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 4px; }
+.form-input { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
+.form-input:focus { border-color: #9b59b6; outline: none; box-shadow: 0 0 0 2px rgba(155,89,182,.15); }
+.modal-title { font-size: 16px; font-weight: 600; padding: 16px 20px; border-bottom: 1px solid #eee; }
+.modal-body { padding: 20px; }
+.modal-actions { padding: 12px 20px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; gap: 10px; }
+.btn-cancel { padding: 8px 20px; border: 1px solid #ddd; border-radius: 4px; background: #fff; cursor: pointer; font-size: 14px; }
+.btn-primary { padding: 8px 20px; border: none; border-radius: 4px; background: #9b59b6; color: #fff; cursor: pointer; font-size: 14px; }
+.btn-primary:hover { background: #8e44ad; }
+
+.modal-overlay { padding: 10px; }
+  
+  /* 卡片/面板 */
+  .card, .stat-card { margin: 8px 0; padding: 12px; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  
+  /* 按钮组 */
+  .form-actions { flex-direction: column; gap: 6px; }
+  .form-actions button { width: 100%; }
+  
+  /* voucher entry rows */
+  .entry-row { flex-direction: column; gap: 4px; }
+  .entry-row input, .entry-row select { width: 100%; }
+  
+  /* filter bars */
+  .filter-bar { flex-direction: column; gap: 6px; }
+  .filter-bar input, .filter-bar select { width: 100%; }
+  
+  /* 双栏布局 -> 单栏 */
+  .section { flex-direction: column; }
+  
+  /* 隐藏次要信息 */
+  .hide-mobile { display: none; }
+}
+
+@media (max-width: 480px) {
+  body { font-size: 13px; }
+  h1 { font-size: 18px; }
+  h2 { font-size: 15px; }
+  h3 { font-size: 14px; }
+  .stat-grid { grid-template-columns: 1fr; }
+  .header nav button { font-size: 11px; padding: 4px 8px; }
+}
+
+
+/* ===== 移动端响应式 ===== */
+@media (max-width: 768px) {
+  body { font-size: 14px; }
+  .container { padding: 10px; max-width: 100%; }
+  .header { flex-direction: column; gap: 8px; text-align: center; }
+  .header nav { flex-wrap: wrap; justify-content: center; gap: 4px; }
+  .header nav button, .header nav .btn { font-size: 12px; padding: 6px 10px; }
+  .tab-bar { overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+  .tab-bar button { font-size: 12px; padding: 8px 12px; flex-shrink: 0; }
+  table { font-size: 12px; display: block; overflow-x: auto; white-space: nowrap; }
+  th, td { padding: 4px 8px; }
+  .form-group { flex-direction: column; }
+  .form-group label { margin-bottom: 4px; min-width: auto; }
+  .form-row { flex-direction: column; gap: 8px; }
+  .modal { width: 95vw !important; max-width: 95vw; margin: 10px; }
+  .modal-mask, .modal-overlay { padding: 10px; }
+  .card, .stat-card { margin: 8px 0; padding: 12px; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .form-actions { flex-direction: column; gap: 6px; }
+  .form-actions button { width: 100%; }
+  .entry-row { flex-direction: column; gap: 4px; }
+  .entry-row input, .entry-row select { width: 100%; }
+  .filter-bar { flex-direction: column; gap: 6px; }
+  .filter-bar input, .filter-bar select { width: 100%; }
+  .section { flex-direction: column; }
+  .hide-mobile { display: none; }
+}
+@media (max-width: 480px) {
+  body { font-size: 13px; }
+  h1 { font-size: 18px; }
+  h2 { font-size: 15px; }
+  h3 { font-size: 14px; }
+  .stat-grid { grid-template-columns: 1fr; }
+  .header nav button { font-size: 11px; padding: 4px 8px; }
+}
+
+
+  .row-matched { background: #e8f5e9 !important; }
+  .tag-default { background: #e0e0e0; color: #666; }
+  .tag-warning { background: #fff3e0; color: #e65100; }
+  .tag-success { background: #e8f5e9; color: #2e7d32; }
+  .tag-info { background: #e3f2fd; color: #1565c0; }
+  .selected-row { background: #f0f7ff !important; }  /* ===== 税务看板 CSS ===== */
+  .tax-summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px; }
+  .tax-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .tax-card-label { font-size: 13px; color: #5f6368; margin-bottom: 6px; }
+  .tax-card-amount { font-size: 28px; font-weight: 700; }
+  .tax-card-detail { font-size: 12px; color: #5f6368; margin-top: 4px; }
+  .tax-amt-vat { color: #1a73e8; }
+  .tax-amt-cit { color: #ea4335; }
+  .tax-amt-surtax { color: #f9ab00; }
+  .tax-amt-total { color: #34a853; }
+  .tax-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  @media (max-width: 900px) { .tax-panels { grid-template-columns: 1fr; } }
+  .tax-panel { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); overflow: hidden; margin-bottom: 16px; }
+  .tax-panel-header { padding: 16px 20px; border-bottom: 1px solid #dadce0; font-weight: 600; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
+  .tax-panel-body { padding: 16px 20px; }
+  .tax-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .tax-badge-green { background: #e6f4ea; color: #137333; }
+  .tax-badge-red { background: #fce8e6; color: #c5221f; }
+  .tax-badge-blue { background: #e8f0fe; color: #1967d2; }
+  .tax-badge-orange { background: #fef7e0; color: #ea8600; }
+  .tax-total-row td { font-weight: 700; border-top: 2px solid #202124; border-bottom: none; }
+  .tax-rate-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #dadce0; }
+  .tax-rate-row:last-child { border-bottom: none; }
+  .tax-rate-name { flex: 1; font-size: 14px; }
+  .tax-rate-input { width: 90px; padding: 6px 10px; border: 1px solid #dadce0; border-radius: 6px; font-size: 14px; text-align: center; }
+  .tax-rate-input:focus { outline: none; border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,.15); }
+  .tax-rate-val { width: 80px; text-align: center; font-size: 14px; font-weight: 600; }
+  .tax-chart-bars { display: flex; align-items: flex-end; gap: 6px; height: 180px; padding-top: 10px; }
+  .tax-chart-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .tax-chart-bar { width: 100%; max-width: 40px; border-radius: 4px 4px 0 0; cursor: pointer; transition: opacity .2s; position: relative; }
+  .tax-chart-bar:hover { opacity: .85; }
+  .tax-chart-bar .tax-chart-tip { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: #333; color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 4px; white-space: nowrap; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .tax-chart-bar:hover .tax-chart-tip { opacity: 1; }
+  .tax-chart-label { font-size: 10px; color: #5f6368; writing-mode: vertical-lr; }
+  .tax-loading { text-align: center; padding: 40px; color: #5f6368; }
+  .tax-empty { text-align: center; padding: 40px; color: #5f6368; font-size: 14px; }
+
+/* 固定资产 */
+.row-dimmed { opacity:0.5; }
+.tag { display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;background:#e8f0fe;color:#1967d2; }
+.tag-in_use { background:#e8f5e9;color:#1e8e3e; }
+.tag-idle { background:#fff8e1;color:#e37400; }
+.tag-disposed { background:#e0e0e0;color:#616161; }
+.tag-scrapped { background:#fce4ec;color:#c62828; }
+/* 库存分类标签 */
+.inv-cat-tag { display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600 }
+.inv-cat-raw_material { background:#e3f2fd;color:#1565c0 }
+.inv-cat-semi_finished { background:#f3e5f5;color:#7b1fa2 }
+.inv-cat-finished_goods { background:#e8f5e9;color:#2e7d32 }
+.inv-cat-packaging { background:#fff3e0;color:#e65100 }
+.inv-cat-consumable { background:#eceff1;color:#546e7a }
+
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- ===== 登录 ===== -->
+  <div v-if="!loggedIn" class="login-box">
+    <h2>🏦 家记账</h2>
+    <input id="username" name="username" autocomplete="username" v-model="loginUser" placeholder="用户名" @keyup.enter="doLogin">
+    <input id="password" name="password" autocomplete="current-password" v-model="loginPass" type="password" placeholder="密码" @keyup.enter="doLogin">
+    <button @click="doLogin">登录</button>
+    <div class="err" v-if="loginErr">{{loginErr}}</div>
+  </div>
+
+  <!-- ===== 主界面 ===== -->
+  <div v-else>
+    <div class="nav">
+      <h1>🏦 家记账</h1>
+      <div class="tabs">
+        <button :class="{active:tab==='dashboard'}" @click="tab='dashboard';loadDashboard()">📊 仪表盘</button>
+        <button :class="{active:tab==='vouchers'}"  @click="tab='vouchers';loadVouchers()">📝 凭证</button>
+        <button :class="{active:tab==='transactions'}" @click="tab='transactions';loadTransactions()">📋 流水</button>
+        <button :class="{active:tab==='ledgers'}" @click="tab='ledgers';loadSubjects();loadGeneralLedger()">📖 账簿</button>
+        <button :class="{active:tab==='statements'}" @click="tab='statements';loadStatements()">📑 报表</button>
+        <button :class="{active:tab==='subjects'}" @click="tab='subjects';loadSubjects()">🏷️ 科目</button>
+        <button :class="{active:tab==='auxiliary'}" @click="tab='auxiliary';loadAuxTypes();loadAuxItems()">🔗 辅助账</button>
+        <button :class="{active:tab==='arap'}" @click="tab='arap';loadArApSummary();loadArApAging('ar')">📊 应收应付</button>
+      <button :class="['btn', tab==='bankrec'?'btn-primary':'btn-outline','btn-sm']" @click="tab='bankrec';loadBankStatements()">🏦 银行对账</button>
+        <button :class="{active:tab==='currencies'}" @click="tab='currencies';loadCurrencies()">💰 币种</button>
+        <button :class="{active:tab==='accounts'}" @click="tab='accounts';loadAccounts()">💳 账户</button>
+                        <button :class="{active:tab==='fixed_assets'}" @click="tab='fixed_assets';loadFixedAssets()" style="background:linear-gradient(135deg,#16a085,#1abc9c);color:#fff;padding:6px 14px;border:none;border-radius:6px;font-size:13px;cursor:pointer">🏢 固定资产</button>
+<button :class="{active:tab==='tax'}" @click="tab='tax';loadTaxDashboard()" style="background:linear-gradient(135deg,#1a73e8,#4285f4);color:#fff;padding:6px 14px;border:none;border-radius:6px;font-size:13px;cursor:pointer">🏛️ 税务</button>
+        <button :class="{active:tab==='inventory'}" @click="tab='inventory';loadInventory();loadInvSubjects()" style="background:linear-gradient(135deg,#f39c12,#e67e22);color:#fff;padding:6px 14px;border:none;border-radius:6px;font-size:13px;cursor:pointer;margin-left:4px">📦 库存</button>
+        <button v-if="userRole==='super_admin'||userRole==='admin'" :class="{active:tab==='users'}" @click="tab='users';loadAdmins()" style="background:linear-gradient(135deg,#9b59b6,#8e44ad);color:#fff;padding:6px 14px;border:none;border-radius:6px;font-size:13px;cursor:pointer;margin-left:6px">👥 用户</button>
+<button @click="loadPeriodCloseStatus" style="background:linear-gradient(135deg,#27ae60,#2ecc71);color:#fff;padding:6px 14px;border:none;border-radius:6px;font-size:13px;cursor:pointer;margin-left:6px">📅 期末结转</button>
+      </div>
+      <div class="right" style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:12px;background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px">{{roleLabel}}</span>
+        <select v-model="currentAsId" @change="switchAccountSet" style="font-size:12px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;max-width:130px">
+          <option v-for="a in accountSets" :key="a.id" :value="a.id">{{a.name}} ({{a.year}})</option>
+        </select>
+        <button v-if="userRole==='super_admin'||userRole==='admin'" @click="tab='accountSets';loadAccountSets()" style="background:none;border:1px solid #ccc;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px" title="管理账套">⚙️</button>
+        <span>👤 {{loginUser}}</span>
+        <button @click="showChangePwd=true" style="background:none;border:1px solid #ccc;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px">🔑 改密</button>
+        <button @click="doLogout">退出</button>
+      </div>
+    </div>
+
+    <div class="main">
+      <!-- ===== 打印抬头 ===== -->
+      <div class="print-header">
+        <h2>聊城市家涵网络信息科技有限公司</h2>
+        <p v-if="reportTitle">{{reportTitle}}</p>
+        <p v-if="reportPeriod">期间：{{reportPeriod}}</p>
+        <p>单位：人民币元</p>
+      </div>
+
+      <!-- ===== 仪表盘 ===== -->
+      <div v-show="tab==='dashboard'">
+        <div class="cards">
+          <div class="card"><div class="label">💰 本月收入</div><div class="value income">¥{{fmt(dashboard.incomeTotal)}}</div></div>
+          <div class="card"><div class="label">💸 本月支出</div><div class="value expense">¥{{fmt(dashboard.expenseTotal)}}</div></div>
+          <div class="card"><div class="label">📈 本月结余</div><div class="value net">¥{{fmt(dashboard.netProfit)}}</div></div>
+          <div class="card"><div class="label">📝 本月笔数</div><div class="value">{{dashboard.transactionCount}} 笔</div></div>
+        </div>
+        <div class="cards" style="grid-template-columns:repeat(3,1fr)">
+          <div class="card"><div class="label">📅 YTD 收入</div><div class="value income">¥{{fmt(dashboard.ytdIncome||0)}}</div></div>
+          <div class="card"><div class="label">💸 YTD 支出</div><div class="value expense">¥{{fmt(dashboard.ytdExpense||0)}}</div></div>
+          <div class="card"><div class="label">📊 YTD 结余</div><div class="value net">¥{{fmt(dashboard.ytdNetProfit||0)}}</div></div>
+        </div>
+        <div class="panel">
+          <h3>📈 近12个月收支趋势</h3>
+          <div class="chart-bar" v-if="dashboard.trend.length">
+            <div class="col" v-for="m in dashboard.trend">
+              <div class="bar-group"><div class="bar income" :style="{height: barHeight(m.income,dashboard.maxTrend)}"></div><div class="bar expense" :style="{height: barHeight(m.expense,dashboard.maxTrend)}"></div></div>
+              <div class="month-label">{{m.month.slice(5)}}月</div>
+            </div>
+          </div>
+          <div class="empty" v-else>暂无数据</div>
+        </div>
+      </div>
+
+      <!-- ===== 凭证管理 ===== -->
+      <div v-show="tab==='vouchers'">
+        <div class="toolbar">
+          <div class="filters">
+            <select id="vFilterType" name="vFilterType" v-model="vFilter.type"><option value="">全部类型</option><option value="记">记</option><option value="收">收</option><option value="付">付</option><option value="转">转</option></select>
+            <select id="vFilterStatus" name="vFilterStatus" v-model="vFilter.status"><option value="">全部状态</option><option value="draft">草稿</option><option value="audited">已审核</option><option value="posted">已过账</option></select>
+            <input type="date" id="vFilterDateFrom" name="vFilterDateFrom" v-model="vFilter.date_from" placeholder="开始">
+            <input type="date" id="vFilterDateTo" name="vFilterDateTo" v-model="vFilter.date_to" placeholder="结束">
+            <button class="btn btn-outline btn-sm" @click="loadVouchers()">🔍</button>
+          </div>
+          <button class="btn btn-primary" @click="openVoucherModal()">+ 填制凭证</button>
+        </div>
+        <table v-if="vouchers.list.length">
+          <thead><tr><th>凭证号</th><th>币种</th><th>日期</th><th>摘要</th><th>借方合计</th><th>贷方合计</th><th>附件</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr v-for="v in vouchers.list" :class="{'reversal-row': v.reversal_of}">
+              <td class="mono">
+                {{v.voucher_no}}
+                <span v-if="v.reversal_of" class="tag reversed" style="margin-left:4px">冲</span>
+                <span v-if="v.is_reversed" class="tag reversed" style="margin-left:4px">已冲</span>
+              </td>
+              <td class="text-center mono">{{v.currency_code||'CNY'}}</td>
+              <td>{{v.voucher_date?.slice(0,10)}}</td>
+              <td>{{v.description||'-'}}</td>
+              <td class="text-right mono">{{v.reversal_of ? '-' : ''}}¥{{fmt(v.total_debit)}}</td>
+              <td class="text-right mono">{{v.reversal_of ? '-' : ''}}¥{{fmt(v.total_credit)}}</td>
+              <td class="text-center">{{v.attachments||0}}</td>
+              <td>
+                <span class="tag" :class="v.status">{{statusLabel(v.status)}}</span>
+                <span v-if="v.is_reversed" class="tag reversed" style="margin-left:4px">已冲销</span>
+              </td>
+              <td>
+                <button class="btn btn-outline btn-xs" @click="viewVoucher(v)">👁</button>
+                <button v-if="v.status==='draft'" class="btn btn-success btn-xs" @click="auditVoucher(v.id)">审核</button>
+                <button v-if="v.status==='audited'" class="btn btn-warning btn-xs" @click="postVoucher(v.id)">过账</button>
+                <button v-if="v.status==='posted' && !v.is_reversed" class="btn btn-outline btn-xs" @click="unpostVoucher(v.id)">反过账</button>
+                <button v-if="v.status==='posted' && !v.is_reversed" class="btn btn-danger btn-xs" @click="reverseVoucher(v)" style="color:#c0392b;border-color:#c0392b">红冲</button>
+                <button v-if="v.status==='draft'" class="btn btn-danger btn-xs" @click="deleteVoucher(v.id)">✕</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="pagination" v-if="vouchers.totalPages>1">
+          <button :disabled="vouchers.page<=1" @click="vouchers.page--;loadVouchers()">上一页</button>
+          <span>第{{vouchers.page}}/{{vouchers.totalPages}}页 (共{{vouchers.total}}条)</span>
+          <button :disabled="vouchers.page>=vouchers.totalPages" @click="vouchers.page++;loadVouchers()">下一页</button>
+        </div>
+        <div class="empty" v-if="!loadingV && !vouchers.list.length">暂无凭证，点击"填制凭证"开始</div>
+      </div>
+
+      <!-- ===== 凭证弹窗（填制/查看） ===== -->
+      <div class="modal-mask" v-if="showVModal" @click.self="showVModal=false">
+        <div class="modal" style="width:800px">
+          <h3>{{voucherView ? '查看凭证: '+voucherView.voucher_no : '填制凭证'}}</h3>
+          <!-- 红冲查看模式提示 -->
+          <div v-if="voucherView && voucherView.reversal_of" style="background:#fff5f5;padding:10px;border-radius:6px;margin-bottom:12px;font-size:13px;color:#c0392b">
+            ⚠ 红字冲销凭证（冲销 {{voucherView.description||''}}）—— 金额以红字显示
+          </div>
+          <div class="form-row" v-if="!voucherView">
+            <div class="form-group"><label>凭证类型</label><select id="vFormType" name="vFormType" v-model="vForm.voucher_type"><option value="记">记</option><option value="收">收</option><option value="付">付</option><option value="转">转</option></select></div>
+            <div class="form-group"><label>币种</label><select id="vFormCurrency" name="vFormCurrency" v-model="vForm.currency_id"><option v-for="c in currencies" :value="c.id">{{c.code}} {{c.symbol}}</option></select></div>
+            <div class="form-group"><label>日期 *</label><input type="date" id="vFormDate" name="vFormDate" v-model="vForm.voucher_date"></div>
+          </div>
+          <div class="form-group" v-if="!voucherView"><label>摘要</label><input type="text" id="vFormDesc" name="vFormDesc" v-model="vForm.description"></div>
+          <hr style="margin:12px 0;border-color:#f0f0f0">
+
+          <!-- 只读视图 -->
+          <template v-if="voucherView">
+            <div class="form-row" style="margin-bottom:12px">
+              <div><strong>日期:</strong> {{voucherView.voucher_date?.slice(0,10)}}</div>
+              <div><strong>摘要:</strong> {{voucherView.description||'-'}}</div>
+              <div><strong>附件:</strong> {{voucherView.attachments||0}}张</div>
+              <div><strong>状态:</strong> <span class="tag" :class="voucherView.status">{{statusLabel(voucherView.status)}}</span></div>
+            </div>
+            <div class="entry-header"><span>科目</span><span>借方金额</span><span>贷方金额</span><span>行摘要</span><span></span></div>
+            <div class="entry-row" v-for="e in voucherView.entries" :style="{background:'#fff',color: voucherView.reversal_of?'#c0392b':''}">
+              <span class="mono">{{e.subject_code}} {{e.subject_name}}</span>
+              <span class="text-right mono">{{e.debit_amount>0?fmt(e.debit_amount):''}}</span>
+              <span class="text-right mono">{{e.credit_amount>0?fmt(e.credit_amount):''}}</span>
+              <span>{{e.summary||''}}</span>
+            </div>
+            <div class="entry-row" style="background:#fdf8e8;font-weight:700">
+              <span>合计</span>
+              <span class="text-right mono" :style="{color:voucherView.reversal_of?'#c0392b':''}">¥{{fmt(voucherView.total_debit)}}</span>
+              <span class="text-right mono" :style="{color:voucherView.reversal_of?'#c0392b':''}">¥{{fmt(voucherView.total_credit)}}</span>
+              <span></span>
+            </div>
+          </template>
+
+          <!-- 编辑表单 -->
+          <template v-if="!voucherView">
+            <div class="entry-header"><span>科目 *</span><span>借方金额</span><span>贷方金额</span><span>行摘要</span><span></span></div>
+            <div class="entry-row" v-for="(e,i) in vForm.entries">
+              <select v-model="e.subject_id" @change="onEntryChange">
+                <option :value="null">请选择科目</option>
+                <option v-for="s in allSubjects" :value="s.id" :key="s.id">{{s.code}} {{s.name}}</option>
+              </select>
+              <input type="number" step="0.01" min="0" v-model.number="e.debit_amount" @input="onEntryChange" placeholder="借方">
+              <input type="number" step="0.01" min="0" v-model.number="e.credit_amount" @input="onEntryChange" placeholder="贷方">
+              <div class="suggest-wrap">
+                <input type="text" v-model="e.summary" placeholder="摘要" @input="suggestSubjects(i)" @blur="blurSuggestion(i)" @focus="e.summary&&e.summary.trim().length>=2&&suggestSubjects(i)" autocomplete="off">
+                <div class="suggest-list" v-if="suggestions[i]&&suggestions[i].length">
+                  <div class="suggest-item" v-for="sug in suggestions[i]" @mousedown.prevent="applySuggestion(i,sug)">
+                    <span class="sug-code">{{sug.code}}</span>
+                    <span class="sug-name">{{sug.name}}</span>
+                    <span class="sug-by" v-if="sug.matched_by">{{sug.matched_by}}</span>
+                    <span class="sug-score">{{(sug.score*100).toFixed(0)}}%</span>
+                  </div>
+                </div>
+              </div>
+              <button class="btn btn-danger btn-xs" @click="vForm.entries.splice(i,1)" :disabled="vForm.entries.length<=2">✕</button>
+              <select v-model="e.aux_type_id" style="width:90px;font-size:12px;height:30px" @change="e.aux_item_id=null"><option value="">+辅助核算</option><option v-for="at in auxTypes" :value="at.id">{{at.name}}</option></select>
+              <select v-model="e.aux_item_id" style="width:120px;font-size:12px;height:30px" v-if="e.aux_type_id"><option value="">选项目</option><option v-for="ai in getAuxItemsByType(e.aux_type_id)" :value="ai.id">{{ai.code}} {{ai.name}}</option></select>
+            </div>
+            <button class="btn btn-outline btn-sm" @click="addEntry" style="margin-top:8px">+ 添加分录行</button>
+            <div class="entry-row" style="background:#fdf8e8;font-weight:700;margin-top:8px">
+              <span>合计</span>
+              <span class="text-right mono">¥{{fmt(totalDebit)}}</span>
+              <span class="text-right mono">¥{{fmt(totalCredit)}}</span>
+              <span :class="Math.abs(totalDebit-totalCredit)<0.01?'balance-ok':'balance-err'">{{Math.abs(totalDebit-totalCredit)<0.01?'✓ 平衡':'✗ 不平'}}</span>
+              <span></span>
+            </div>
+          </template>
+
+          <div class="form-actions">
+            <button class="btn btn-outline" @click="showVModal=false;voucherView=null">关闭</button>
+            <button v-if="!voucherView" class="btn btn-primary" @click="saveVoucher">保存凭证</button>
+            <button v-if="!voucherView" class="btn btn-outline no-print" @click="printVoucherPreview">🖨 打印预览</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 流水（含合计/累计） ===== -->
+      <div v-show="tab==='transactions'">
+        <div class="toolbar no-print">
+          <div class="filters">
+            <select id="tFilterType" name="tFilterType" v-model="tFilter.type"><option value="">全部类型</option><option value="income">收入</option><option value="expense">支出</option></select>
+            <select id="tFilterSubject" name="tFilterSubject" v-model="tFilter.subject_id"><option value="">全部科目</option><option v-for="s in allSubjects" :value="s.id" :key="s.id">{{s.code}} {{s.name}}</option></select>
+            <input type="date" id="tFilterDateFrom" name="tFilterDateFrom" v-model="tFilter.date_from">
+            <input type="date" id="tFilterDateTo" name="tFilterDateTo" v-model="tFilter.date_to">
+            <input type="text" id="tFilterKeyword" name="tFilterKeyword" v-model="tFilter.keyword" placeholder="搜索..." style="width:120px">
+            <button class="btn btn-outline btn-sm" @click="loadTransactions()">🔍</button>
+          </div>
+          <div>
+            <button class="btn btn-outline btn-sm" @click="exportCSV">📥 CSV</button>
+          </div>
+        </div>
+        <!-- 合计卡片 -->
+        <div class="cards" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px" v-if="txMeta">
+          <div class="card" style="padding:12px"><div class="label" style="font-size:11px">本页收入</div><div class="value income" style="font-size:18px">¥{{fmt(txMeta.pageTotals.income)}}</div></div>
+          <div class="card" style="padding:12px"><div class="label" style="font-size:11px">本页支出</div><div class="value expense" style="font-size:18px">¥{{fmt(txMeta.pageTotals.expense)}}</div></div>
+          <div class="card" style="padding:12px"><div class="label" style="font-size:11px">本期收入</div><div class="value income" style="font-size:18px">¥{{fmt(txMeta.periodTotals.income)}}</div></div>
+          <div class="card" style="padding:12px"><div class="label" style="font-size:11px">本期支出</div><div class="value expense" style="font-size:18px">¥{{fmt(txMeta.periodTotals.expense)}}</div></div>
+        </div>
+        <table v-if="transactions.list.length">
+          <thead><tr><th>日期</th><th>类型</th><th>会计科目</th><th>金额</th><th>摘要</th><th>对方</th><th>凭证号</th></tr></thead>
+          <tbody>
+            <tr v-for="t in transactions.list">
+              <td>{{t.date?.slice(0,10)}}</td>
+              <td><span class="tag" :class="t.type">{{t.type==='income'?'收入':'支出'}}</span></td>
+              <td class="mono">{{t.subject_code}} {{t.subject_name}}</td>
+              <td :style="{color:t.type==='income'?'#27ae60':'#e74c3c',fontWeight:'600'}">{{t.type==='income'?'+':'-'}}¥{{fmt(t.amount)}}</td>
+              <td>{{t.description||'-'}}</td>
+              <td>{{t.counterparty||'-'}}</td>
+              <td class="mono">{{t.voucher_no||'-'}}</td>
+            </tr>
+          </tbody>
+          <!-- 合计行 -->
+          <tfoot>
+            <tr class="totals-row">
+              <td colspan="3" class="totals-label">本页合计</td>
+              <td><span class="mini-stat income-bg">+¥{{fmt(txMeta?.pageTotals.income||0)}}</span><span class="mini-stat expense-bg">-¥{{fmt(txMeta?.pageTotals.expense||0)}}</span></td>
+              <td colspan="3" class="totals-label">净额: ¥{{fmt((txMeta?.pageTotals.income||0)-(txMeta?.pageTotals.expense||0))}}</td>
+            </tr>
+            <tr class="totals-row" style="background:#e8f5e9 !important">
+              <td colspan="3" class="totals-label">本期合计</td>
+              <td><span class="mini-stat income-bg">+¥{{fmt(txMeta?.periodTotals.income||0)}}</span><span class="mini-stat expense-bg">-¥{{fmt(txMeta?.periodTotals.expense||0)}}</span></td>
+              <td colspan="3" class="totals-label">净额: ¥{{fmt((txMeta?.periodTotals.income||0)-(txMeta?.periodTotals.expense||0))}}</td>
+            </tr>
+            <tr class="totals-row" style="background:#e3f2fd !important">
+              <td colspan="3" class="totals-label">本年累计</td>
+              <td><span class="mini-stat income-bg">+¥{{fmt(txMeta?.ytdTotals.income||0)}}</span><span class="mini-stat expense-bg">-¥{{fmt(txMeta?.ytdTotals.expense||0)}}</span></td>
+              <td colspan="3" class="totals-label">YTD净额: ¥{{fmt((txMeta?.ytdTotals.income||0)-(txMeta?.ytdTotals.expense||0))}}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <div class="pagination" v-if="transactions.totalPages>1">
+          <button :disabled="transactions.page<=1" @click="transactions.page--;loadTransactions()">上一页</button>
+          <span>第{{transactions.page}}/{{transactions.totalPages}}页 (共{{transactions.total}}条)</span>
+          <button :disabled="transactions.page>=transactions.totalPages" @click="transactions.page++;loadTransactions()">下一页</button>
+        </div>
+        <div class="empty" v-if="!loadingT && !transactions.list.length">暂无流水</div>
+      </div>
+
+      <!-- ===== 账簿 ===== -->
+      <div v-show="tab==='ledgers'">
+        <div class="toolbar no-print">
+          <div class="filters">
+            <button :class="['btn', ledgerTab==='general'?'btn-primary':'btn-outline','btn-sm']" @click="ledgerTab='general';loadGeneralLedger()">总账</button>
+            <button :class="['btn', ledgerTab==='detail'?'btn-primary':'btn-outline','btn-sm']" @click="ledgerTab='detail'">明细账</button>
+            <button :class="['btn', ledgerTab==='cash'?'btn-primary':'btn-outline','btn-sm']" @click="ledgerTab='cash';loadJournal('cash')">现金日记账</button>
+            <button :class="['btn', ledgerTab==='bank'?'btn-primary':'btn-outline','btn-sm']" @click="ledgerTab='bank';loadJournal('bank')">银行日记账</button>
+          </div>
+          <div class="filters">
+            <input type="date" id="ledgerDateFrom" name="ledgerDateFrom" v-model="ledgerDateFrom" placeholder="开始">
+            <input type="date" id="ledgerDateTo" name="ledgerDateTo" v-model="ledgerDateTo" placeholder="结束">
+            <select id="ledgerYear" name="ledgerYear" v-model="ledgerYear" style="width:80px"><option value="">年</option><option v-for="y in yearOptions" :value="y">{{y}}</option></select>
+            <select id="ledgerMonth" name="ledgerMonth" v-model="ledgerMonth" style="width:60px"><option value="">月</option><option v-for="m in 12" :value="m">{{m}}</option></select>
+            <button class="btn btn-outline btn-sm" @click="refreshLedger">🔍</button>
+            <button class="btn btn-outline btn-sm" @click="printLedger">🖨 打印</button>
+          </div>
+        </div>
+
+        <!-- 总账（+ 合计行 + YTD累计） -->
+        <div v-if="ledgerTab==='general'">
+          <div class="print-header"><h2>总分类账</h2></div>
+          <div v-if="generalLedger">
+            <table class="ledger-table" v-if="generalLedger.list && generalLedger.list.length">
+              <thead><tr><th>科目编码</th><th>科目名称</th><th>类</th><th class="text-right">期初余额</th><th class="text-right">本期借方</th><th class="text-right">本期贷方</th><th class="text-right">YTD借方</th><th class="text-right">YTD贷方</th><th class="text-right">余额</th><th>方向</th></tr></thead>
+              <tbody>
+                <tr v-for="r in generalLedger.list" v-if="r.period_debit>0||r.period_credit>0||r.ytd_debit>0||r.ytd_credit>0">
+                  <td class="mono">{{r.code}}</td><td>{{r.name}}</td><td>{{typeLabel(r.type)}}</td>
+                  <td class="text-right mono" :style="{color:Number(r.opening_balance)<0?'#e74c3c':''}" v-if="r.opening_balance!==undefined">{{r.opening_balance>0?'¥':''}}{{fmt(Math.abs(r.opening_balance))}}</td><td class="text-right mono">¥{{fmt(r.period_debit)}}</td>
+                  <td class="text-right mono">¥{{fmt(r.period_credit)}}</td>
+                  <td class="text-right mono">¥{{fmt(r.ytd_debit)}}</td>
+                  <td class="text-right mono">¥{{fmt(r.ytd_credit)}}</td>
+                  <td class="text-right mono" :style="{color:r.balance<0?'#e74c3c':''}">¥{{fmt(Math.abs(r.balance))}}</td>
+                  <td>{{r.direction==='debit'?'借':'贷'}}</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr class="totals-row">
+                  <td colspan="4" class="totals-label">合 计</td>
+                  <td class="text-right mono">¥{{fmt(generalLedger.totals?.period_debit||0)}}</td>
+                  <td class="text-right mono">¥{{fmt(generalLedger.totals?.period_credit||0)}}</td>
+                  <td class="text-right mono">¥{{fmt(generalLedger.totals?.ytd_debit||0)}}</td>
+                  <td class="text-right mono">¥{{fmt(generalLedger.totals?.ytd_credit||0)}}</td>
+                  <td colspan="2" class="totals-label" :class="Math.abs((generalLedger.totals?.period_debit||0)-(generalLedger.totals?.period_credit||0))<0.01?'balance-ok':'balance-err'">
+                    {{Math.abs((generalLedger.totals?.period_debit||0)-(generalLedger.totals?.period_credit||0))<0.01?'✓ 借平':'✗ 不平'}}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div class="empty" v-if="!generalLedger || !generalLedger.list || !generalLedger.list.length">暂无总账数据</div>
+        </div>
+
+        <!-- 明细账（+ 期初/承前/本期合计/本年累计） -->
+        <div v-if="ledgerTab==='detail'">
+          <div class="form-group no-print" style="max-width:400px"><label>选择科目</label>
+            <select v-model="detailSubjectId" @change="loadDetailLedger()"><option :value="null">请选择</option><option v-for="s in allSubjects" :value="s.id">{{s.code}} {{s.name}}</option></select>
+          </div>
+          <div v-if="detailLedger.subject">
+            <div class="print-header"><h2>明细分类账 — {{detailLedger.subject?.code}} {{detailLedger.subject?.name}}</h2></div>
+            <!-- 标头信息 -->
+            <div style="display:flex;gap:24px;margin-bottom:12px;font-size:13px">
+              <span>期初余额: <b>¥{{fmt(detailLedger.openingBalance||0)}}</b></span>
+              <span v-if="detailLedger.preBalance!==undefined && detailLedger.preBalance!==detailLedger.openingBalance">承前页: <b>¥{{fmt(detailLedger.preBalance)}}</b></span>
+              <span>本期借方: <b style="color:#e74c3c">¥{{fmt(detailLedger.periodTotals?.debit||0)}}</b></span>
+              <span>本期贷方: <b style="color:#27ae60">¥{{fmt(detailLedger.periodTotals?.credit||0)}}</b></span>
+              <span>期末余额: <b>¥{{fmt(detailLedger.balance||0)}}</b></span>
+            </div>
+            <table class="ledger-table">
+              <thead><tr><th>日期</th><th>凭证号</th><th>摘要</th><th class="text-right">借方</th><th class="text-right">贷方</th><th class="text-right">余额</th></tr></thead>
+              <tbody>
+                <!-- 承前页行 -->
+                <tr v-if="detailPage>1" class="interim-row">
+                  <td colspan="3">承 前 页</td>
+                  <td class="text-right mono"></td><td class="text-right mono"></td>
+                  <td class="text-right mono">¥{{fmt(detailLedger.preBalance)}}</td>
+                </tr>
+                <tr v-for="r in detailLedger.list">
+                  <td>{{r.date?.slice(0,10)}}</td><td class="mono">{{r.voucher_no||'-'}}</td><td>{{r.description||''}}</td>
+                  <td class="text-right mono">{{r.type==='expense'?fmt(r.amount):''}}</td>
+                  <td class="text-right mono">{{r.type==='income'?fmt(r.amount):''}}</td>
+                  <td class="text-right mono">¥{{fmt(r.running_balance)}}</td>
+                </tr>
+                <!-- 过次页 -->
+                <tr v-if="detailLedger.totalPages>1 && detailPage < detailLedger.totalPages" class="interim-row">
+                  <td colspan="3">过 次 页</td>
+                  <td class="text-right mono"></td><td class="text-right mono"></td>
+                  <td class="text-right mono">¥{{fmt(detailLedger.list.length?detailLedger.list[detailLedger.list.length-1].running_balance:detailLedger.balance)}}</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr class="totals-row">
+                  <td colspan="3" class="totals-label">本期合计</td>
+                  <td class="text-right mono">¥{{fmt(detailLedger.periodTotals?.debit||0)}}</td>
+                  <td class="text-right mono">¥{{fmt(detailLedger.periodTotals?.credit||0)}}</td>
+                  <td></td>
+                </tr>
+                <tr class="totals-row" style="background:#e3f2fd !important">
+                  <td colspan="3" class="totals-label">本年累计</td>
+                  <td class="text-right mono">¥{{fmt(detailLedger.ytdTotals?.debit||0)}}</td>
+                  <td class="text-right mono">¥{{fmt(detailLedger.ytdTotals?.credit||0)}}</td>
+                  <td class="text-right mono">¥{{fmt(Math.abs(detailLedger.ytdTotals?.balance||0))}}</td>
+                </tr>
+              </tfoot>
+            </table>
+            <div class="pagination no-print" v-if="detailLedger.totalPages>1">
+              <button :disabled="detailPage<=1" @click="detailPage--;loadDetailLedger()">上一页</button>
+              <span>第{{detailPage}}/{{detailLedger.totalPages}}页 (共{{detailLedger.total}}条)</span>
+              <button :disabled="detailPage>=detailLedger.totalPages" @click="detailPage++;loadDetailLedger()">下一页</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 日记账（+ 日合计/本期合计） -->
+        <div v-if="ledgerTab==='cash'||ledgerTab==='bank'">
+          <div class="print-header"><h2>{{ledgerTab==='cash'?'现金':'银行'}}日记账</h2></div>
+          <div v-if="journal.list">
+            <div style="font-size:13px;margin-bottom:8px">期初余额: <b>¥{{fmt(journal.openingBalance||0)}}</b></div>
+            <table class="ledger-table">
+              <thead><tr><th>日期</th><th>凭证号</th><th>摘要</th><th class="text-right">收入</th><th class="text-right">支出</th><th class="text-right">余额</th></tr></thead>
+              <tbody>
+                <template v-for="(r,idx) in journal.list">
+                  <!-- 日合计插入 -->
+                  <tr v-if="showDailyTotal(r, idx)" class="interim-row">
+                    <td colspan="3">{{r.date?.slice(0,10)}} 日合计</td>
+                    <td class="text-right mono">{{fmt(getDailyTotal(r.date?.slice(0,10)).debit)}}</td>
+                    <td class="text-right mono">{{fmt(getDailyTotal(r.date?.slice(0,10)).credit)}}</td>
+                    <td class="text-right mono">¥{{fmt(getDailyTotal(r.date?.slice(0,10)).balance)}}</td>
+                  </tr>
+                  <tr>
+                    <td>{{r.date?.slice(0,10)}}</td>
+                    <td class="mono">{{r.voucher_no||'-'}}</td>
+                    <td>{{r.description||''}}</td>
+                    <td class="text-right mono">{{r.type==='income'?fmt(r.amount):''}}</td>
+                    <td class="text-right mono">{{r.type==='expense'?fmt(r.amount):''}}</td>
+                    <td class="text-right mono">¥{{fmt(r.running_balance)}}</td>
+                  </tr>
+                </template>
+              </tbody>
+              <tfoot>
+                <tr class="totals-row">
+                  <td colspan="3" class="totals-label">本期合计</td>
+                  <td class="text-right mono">¥{{fmt(journal.periodTotals?.debit||0)}}</td>
+                  <td class="text-right mono">¥{{fmt(journal.periodTotals?.credit||0)}}</td>
+                  <td class="text-right mono">¥{{fmt(journal.periodTotals?.balance||0)}}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div class="empty" v-if="journal.list && !journal.list.length">暂无{{ledgerTab==='cash'?'现金':'银行'}}交易</div>
+        </div>
+      </div>
+
+      <!-- ===== 报表 ===== -->
+      <div v-show="tab==='statements'">
+        <div class="toolbar no-print">
+          <div class="filters">
+            <button :class="['btn', stmtTab==='trial'?'btn-primary':'btn-outline','btn-sm']" @click="stmtTab='trial';loadTrialBalance()">试算平衡表</button>
+            <button :class="['btn', stmtTab==='balance'?'btn-primary':'btn-outline','btn-sm']" @click="stmtTab='balance';loadBalanceSheet()">资产负债表</button>
+            <button :class="['btn', stmtTab==='income'?'btn-primary':'btn-outline','btn-sm']" @click="stmtTab='income';loadIncomeStatement()">利润表</button>
+            <a href="/accounting/reports.html" target="_blank" class="btn btn-sm" style="background:#1a73e8;color:#fff">📊 综合报表</a>
+          </div>
+          <div class="filters">
+            <input type="date" v-model="reportDate" placeholder="截止日期" v-if="stmtTab!=='income'">
+            <input type="text" v-model="reportYear" placeholder="年" style="width:60px"> <!-- 现金流量表 -->
+<div v-if="stmtTab==='cashflow'" class="panel">
+<div class="panel-header">💰 现金流量表 <small style="color:#888;font-weight:normal;margin-left:10px">{{cashFlow.period}}</small>
+<span style="float:right;font-size:12px">
+<button class="btn btn-sm btn-outline" @click="exportCashFlow">📥 导出CSV</button>
+<select v-model="cashFlowPeriod" @change="loadCashFlow()" style="margin-left:8px;padding:4px 8px;border:1px solid #ddd;border-radius:4px">
+<option v-for="p in cashFlowPeriods" :value="p.value">{{p.label}}</option>
+</select>
+</span>
+</div>
+<div style="overflow-x:auto">
+<table class="data-table" style="width:100%;font-size:13px">
+<thead><tr><th>项目</th><th style="width:80px">行次</th><th style="width:130px" class="text-right">金额</th></tr></thead>
+<tbody>
+<template v-for="(it,i) in cashFlow.items">
+<tr v-if="it.is_subtotal" :style="it.section==='一'||it.section==='二'||it.section==='三'?'font-weight:bold;background:#f9f9f9;border-top:2px solid #ddd':it.item_name.includes('净增加')?'font-weight:bold;background:#e8f5e9;border-top:2px solid #27ae60;font-size:14px':'font-weight:bold;background:#f9f9f9'">
+<td :style="it.item_name.includes('净增加')?'padding-left:16px':it.section==='五'?'padding-left:16px':'padding-left:16px'">{{it.item_name}}</td>
+<td>{{i+1}}</td>
+<td class="mono text-right">{{it.amount.toFixed(2)}}</td>
+</tr>
+<tr v-else-if="it.section==='五'" :style="it.item_name.includes('期初')?'':'font-weight:bold'">
+<td style="padding-left:16px">{{it.item_name}}</td>
+<td>{{i+1}}</td>
+<td class="mono text-right">{{it.amount.toFixed(2)}}</td>
+</tr>
+<tr v-else>
+<td style="padding-left:32px">{{it.item_name}}</td>
+<td>{{i+1}}</td>
+<td class="mono text-right">{{it.amount.toFixed(2)}}</td>
+</tr>
+</template>
+</tbody>
+</table>
+</div>
+</div>
+
+<div v-if="stmtTab==='income'">
+            <input type="text" v-model="reportMonth" placeholder="月" style="width:50px" v-if="stmtTab==='income'">
+            <button class="btn btn-outline btn-sm" @click="refreshReport">🔍</button>
+            <button class="btn btn-outline btn-sm" @click="window.print()">🖨 打印</button>
+          </div>
+        </div>
+
+        <!-- 试算平衡表 -->
+        <div v-if="stmtTab==='trial'&&trialBalance.items">
+          <div class="print-header"><h2>试算平衡表 <a :href="apiBase+'/api/accounting/statements/trial-balance/export?year='+reportYear+'&month='+reportMonth" class="btn btn-sm btn-outline" style="margin-left:10px">📥 CSV</a></h2><p>{{reportDate?'截止: '+reportDate:''}}</p></div>
+          <p style="margin-bottom:12px">借方合计: ¥{{fmt(trialBalance.totalDebit)}} | 贷方合计: ¥{{fmt(trialBalance.totalCredit)}} |
+            <span :class="trialBalance.balanced?'balance-ok':'balance-err'">{{trialBalance.balanced?'✓ 平衡':'✗ 不平 — 差额: ¥'+fmt(trialBalance.diff)}}</span></p>
+          <table>
+            <thead><tr><th>编码</th><th>科目</th><th>类型</th><th class="text-right">借方金额</th><th class="text-right">贷方金额</th></tr></thead>
+            <tbody>
+              <tr v-for="r in trialBalance.items">
+                <td class="mono">{{r.code}}</td><td>{{r.name}}</td><td>{{typeLabel(r.type)}}</td>
+                <td class="text-right mono">¥{{fmt(r.total_debit)}}</td>
+                <td class="text-right mono">¥{{fmt(r.total_credit)}}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 资产负债表（税务合规） -->
+        <div v-if="stmtTab==='balance'&&balanceSheet.totalAssets!==undefined">
+          <div class="print-header"><h2>资产负债表 <span style="font-size:12px;color:#888;font-weight:normal;margin-left:10px">(单位: 元)</span> <a :href="apiBase+'/api/accounting/statements/balance-sheet/export?year='+reportYear+'&month='+reportMonth" class="btn btn-sm btn-outline" style="margin-left:10px">📥 CSV</a></h2><p>{{reportYear}}年{{reportMonth||'12'}}月31日</p></div>
+          <table style="width:100%;font-size:13px">
+            <thead><tr><th>项目</th><th style="width:100px" class="text-right">期末余额</th><th style="width:100px" class="text-right">年初余额</th></tr></thead>
+            <tbody>
+              <tr style="font-weight:700;background:#fafafa"><td colspan="3">流动资产</td></tr>
+              <tr v-for="r in balanceSheet.currentAssets.items">
+                <td style="padding-left:24px" class="mono">{{r.code}} {{r.name}}</td>
+                <td class="text-right mono">{{fmt(r.closing_balance)}}</td>
+                <td class="text-right mono">{{fmt(r.opening_balance)}}</td>
+              </tr>
+              <tr class="total-row"><td>流动资产合计</td><td class="text-right mono">{{fmt(balanceSheet.currentAssets.closing)}}</td><td class="text-right mono">{{fmt(balanceSheet.currentAssets.opening)}}</td></tr>
+              <tr style="font-weight:700;background:#fafafa"><td colspan="3">非流动资产</td></tr>
+              <tr v-for="r in balanceSheet.nonCurrentAssets.items">
+                <td style="padding-left:24px" class="mono">{{r.code}} {{r.name}}</td>
+                <td class="text-right mono">{{fmt(r.closing_balance)}}</td>
+                <td class="text-right mono">{{fmt(r.opening_balance)}}</td>
+              </tr>
+              <tr class="total-row"><td>非流动资产合计</td><td class="text-right mono">{{fmt(balanceSheet.nonCurrentAssets.closing)}}</td><td class="text-right mono">{{fmt(balanceSheet.nonCurrentAssets.opening)}}</td></tr>
+              <tr style="font-weight:700;font-size:14px;background:#e8f5e9"><td>资产总计</td><td class="text-right mono" style="font-weight:700">{{fmt(balanceSheet.totalAssets)}}</td><td class="text-right mono">{{fmt(balanceSheet.totalAssetsOpen)}}</td></tr>
+              <tr style="font-weight:700;background:#fafafa"><td colspan="3">流动负债</td></tr>
+              <tr v-for="r in balanceSheet.currentLiabilities.items">
+                <td style="padding-left:24px" class="mono">{{r.code}} {{r.name}}</td>
+                <td class="text-right mono">{{fmt(r.closing_balance)}}</td>
+                <td class="text-right mono">{{fmt(r.opening_balance)}}</td>
+              </tr>
+              <tr class="total-row"><td>流动负债合计</td><td class="text-right mono">{{fmt(balanceSheet.currentLiabilities.closing)}}</td><td class="text-right mono">{{fmt(balanceSheet.currentLiabilities.opening)}}</td></tr>
+              <tr style="font-weight:700;background:#fafafa"><td colspan="3">非流动负债</td></tr>
+              <tr v-for="r in balanceSheet.nonCurrentLiabilities.items">
+                <td style="padding-left:24px" class="mono">{{r.code}} {{r.name}}</td>
+                <td class="text-right mono">{{fmt(r.closing_balance)}}</td>
+                <td class="text-right mono">{{fmt(r.opening_balance)}}</td>
+              </tr>
+              <tr class="total-row"><td>非流动负债合计</td><td class="text-right mono">{{fmt(balanceSheet.nonCurrentLiabilities.closing)}}</td><td class="text-right mono">{{fmt(balanceSheet.nonCurrentLiabilities.opening)}}</td></tr>
+              <tr style="font-weight:700;font-size:14px;background:#fff3cd"><td>负债合计</td><td class="text-right mono" style="font-weight:700">{{fmt(balanceSheet.totalLiabilities)}}</td><td class="text-right mono">{{fmt(balanceSheet.totalLiabilitiesOpen)}}</td></tr>
+              <tr style="font-weight:700;background:#fafafa"><td colspan="3">所有者权益</td></tr>
+              <tr v-for="r in balanceSheet.equity.items">
+                <td style="padding-left:24px" class="mono">{{r.code}} {{r.name}}</td>
+                <td class="text-right mono">{{fmt(r.closing_balance)}}</td>
+                <td class="text-right mono">{{fmt(r.opening_balance)}}</td>
+              </tr>
+              <tr><td style="padding-left:24px">未分配利润</td><td class="text-right mono">{{fmt(balanceSheet.netProfit)}}</td><td class="text-right mono">0.00</td></tr>
+              <tr class="total-row"><td>所有者权益合计</td><td class="text-right mono">{{fmt(balanceSheet.totalEquity)}}</td><td class="text-right mono">{{fmt(balanceSheet.totalEquityOpen)}}</td></tr>
+              <tr style="font-weight:700;background:#e8f5e9"><td>负债和所有者权益总计</td><td class="text-right mono" style="font-weight:700">{{fmt(Number(balanceSheet.totalLiabilities)+Number(balanceSheet.totalEquity))}}</td><td class="text-right mono">{{fmt(Number(balanceSheet.totalLiabilitiesOpen)+Number(balanceSheet.totalEquityOpen))}}</td></tr>
+            </tbody>
+          </table>
+          <div style="margin-top:12px;text-align:center;font-size:13px">
+            <span :class="balanceSheet.balanced?'balance-ok':'balance-err'">{{balanceSheet.balanced?'✓ 资产=负债+权益 平衡':'✗ 不平 差额:'+fmt(Math.abs(Number(balanceSheet.totalAssets)-Number(balanceSheet.totalLiabilities)-Number(balanceSheet.totalEquity)))}}</span>
+          </div>
+        </div>
+
+        <!-- 利润表（税务合规 — 多步式） -->
+        <div v-if="stmtTab==='income'&&incomeStatement.period">
+          <div class="print-header"><h2>利润表 <span style="font-size:12px;color:#888;font-weight:normal;margin-left:10px">(单位: 元)</span> <a :href="apiBase+'/api/accounting/statements/income-statement/export?year='+reportYear+'&month='+reportMonth" class="btn btn-sm btn-outline" style="margin-left:10px">📥 CSV</a></h2><p>{{reportYear}}年{{reportMonth||'1'}}月</p></div>
+          <table>
+            <thead><tr><th>项目</th><th style="width:120px" class="text-right">本期金额</th><th style="width:120px" class="text-right">本年累计</th></tr></thead>
+            <tbody>
+              <tr><td colspan="3" style="font-weight:700;background:#fafafa">一、营业收入</td></tr>
+              <tr v-for="r in incomeStatement.operatingRevenue">
+                <td style="padding-left:24px" class="mono">{{r.code}} {{r.name}}</td>
+                <td class="text-right mono">{{fmt(r.credit_amount)}}</td>
+                <td class="text-right mono">{{fmt(r.ytd_credit)}}</td>
+              </tr>
+              <tr class="total-row"><td>营业收入</td><td class="text-right mono">{{fmt(incomeStatement.period.operatingRevenue)}}</td><td class="text-right mono">{{fmt(incomeStatement.ytd.operatingRevenue)}}</td></tr>
+
+              <tr><td colspan="3" style="font-weight:700;background:#fafafa">减：营业成本</td></tr>
+              <tr v-for="r in incomeStatement.operatingCost">
+                <td style="padding-left:24px" class="mono">{{r.code}} {{r.name}}</td>
+                <td class="text-right mono">{{fmt(r.debit_amount)}}</td>
+                <td class="text-right mono">{{fmt(r.ytd_debit)}}</td>
+              </tr>
+              <tr class="total-row"><td>营业成本</td><td class="text-right mono">{{fmt(incomeStatement.period.operatingCost)}}</td><td class="text-right mono">{{fmt(incomeStatement.ytd.operatingCost)}}</td></tr>
+
+              <tr><td>税金及附加</td><td class="text-right mono">{{fmt(incomeStatement.period.taxSurcharge)}}</td><td class="text-right mono">{{fmt(incomeStatement.ytd.taxSurcharge)}}</td></tr>
+
+              <tr><td colspan="3" style="font-weight:700;background:#fafafa">减：期间费用</td></tr>
+              <tr v-for="r in incomeStatement.adminExpenses">
+                <td style="padding-left:24px" class="mono">{{r.code}} {{r.name}}</td>
+                <td class="text-right mono">{{fmt(r.debit_amount)}}</td>
+                <td class="text-right mono">{{fmt(r.ytd_debit)}}</td>
+              </tr>
+              <tr class="total-row"><td>管理费用</td><td class="text-right mono">{{fmt(incomeStatement.period.adminExpense)}}</td><td class="text-right mono">{{fmt(incomeStatement.ytd.adminExpense)}}</td></tr>
+              <tr v-for="r in incomeStatement.sellExpenses" v-if="(r.debit_amount>0||r.ytd_debit>0)">
+                <td style="padding-left:24px" class="mono">{{r.code}} {{r.name}}</td>
+                <td class="text-right mono">{{fmt(r.debit_amount)}}</td>
+                <td class="text-right mono">{{fmt(r.ytd_debit)}}</td>
+              </tr>
+              <tr class="total-row"><td>销售费用</td><td class="text-right mono">{{fmt(incomeStatement.period.sellExpense)}}</td><td class="text-right mono">{{fmt(incomeStatement.ytd.sellExpense)}}</td></tr>
+              <tr v-for="r in incomeStatement.finExpenses" v-if="(r.debit_amount>0||r.ytd_debit>0)">
+                <td style="padding-left:24px" class="mono">{{r.code}} {{r.name}}</td>
+                <td class="text-right mono">{{fmt(r.debit_amount)}}</td>
+                <td class="text-right mono">{{fmt(r.ytd_debit)}}</td>
+              </tr>
+              <tr class="total-row"><td>财务费用</td><td class="text-right mono">{{fmt(incomeStatement.period.finExpense)}}</td><td class="text-right mono">{{fmt(incomeStatement.ytd.finExpense)}}</td></tr>
+
+              <tr><td>加：投资收益</td><td class="text-right mono">{{fmt(incomeStatement.period.investmentIncome)}}</td><td class="text-right mono">{{fmt(incomeStatement.ytd.investmentIncome)}}</td></tr>
+
+              <tr style="background:#fdf8e8;font-weight:700">
+                <td>二、营业利润</td>
+                <td class="text-right mono" :style="{color:Number(incomeStatement.period.operatingProfit)<0?'#e74c3c':'#27ae60'}">{{fmt(incomeStatement.period.operatingProfit)}}</td>
+                <td class="text-right mono" :style="{color:Number(incomeStatement.ytd.operatingProfit)<0?'#e74c3c':'#27ae60'}">{{fmt(incomeStatement.ytd.operatingProfit)}}</td>
+              </tr>
+
+              <tr><td colspan="3" style="font-weight:700;background:#fafafa">加：营业外收入</td></tr>
+              <tr v-for="r in incomeStatement.nonOpRevenue">
+                <td style="padding-left:24px" class="mono">{{r.code}} {{r.name}}</td>
+                <td class="text-right mono">{{fmt(r.credit_amount)}}</td>
+                <td class="text-right mono">{{fmt(r.ytd_credit)}}</td>
+              </tr>
+              <tr class="total-row"><td>营业外收入</td><td class="text-right mono">{{fmt(incomeStatement.period.nonOpRevenue)}}</td><td class="text-right mono">{{fmt(incomeStatement.ytd.nonOpRevenue)}}</td></tr>
+
+              <tr><td colspan="3" style="font-weight:700;background:#fafafa">减：营业外支出</td></tr>
+              <tr v-for="r in incomeStatement.nonOpExpenses">
+                <td style="padding-left:24px" class="mono">{{r.code}} {{r.name}}</td>
+                <td class="text-right mono">{{fmt(r.debit_amount)}}</td>
+                <td class="text-right mono">{{fmt(r.ytd_debit)}}</td>
+              </tr>
+              <tr class="total-row"><td>营业外支出</td><td class="text-right mono">{{fmt(incomeStatement.period.nonOpExpense)}}</td><td class="text-right mono">{{fmt(incomeStatement.ytd.nonOpExpense)}}</td></tr>
+
+              <tr style="background:#fdf8e8;font-weight:700">
+                <td>三、利润总额</td>
+                <td class="text-right mono" :style="{color:Number(incomeStatement.period.totalProfit)<0?'#e74c3c':'#27ae60'}">{{fmt(incomeStatement.period.totalProfit)}}</td>
+                <td class="text-right mono" :style="{color:Number(incomeStatement.ytd.totalProfit)<0?'#e74c3c':'#27ae60'}">{{fmt(incomeStatement.ytd.totalProfit)}}</td>
+              </tr>
+
+              <tr><td>减：所得税费用</td><td class="text-right mono">{{fmt(incomeStatement.period.incomeTax)}}</td><td class="text-right mono">{{fmt(incomeStatement.ytd.incomeTax)}}</td></tr>
+
+              <tr style="background:#e74c3c;color:#fff;font-weight:700;font-size:15px">
+                <td>四、净利润</td>
+                <td class="text-right mono">{{fmt(incomeStatement.period.netProfit)}}</td>
+                <td class="text-right mono">{{fmt(incomeStatement.ytd.netProfit)}}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      
+      </div>
+      
+      <!-- ===== 辅助核算 ===== -->
+      <div v-show="tab==='auxiliary'">
+        <div class="toolbar">
+          <div class="filters">
+            <select v-model="auxFilter.type_id" @change="loadAuxItems" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+              <option value="">全部类型</option>
+              <option v-for="t in auxTypes" :value="t.id">{{t.name}}</option>
+            </select>
+            <input v-model="auxFilter.keyword" @keyup.enter="loadAuxItems" placeholder="搜索项目..." style="width:180px">
+            <button class="btn btn-outline" @click="loadAuxItems">🔍</button>
+            <button class="btn btn-primary" @click="openAuxItemModal()">+ 新增项目</button>
+            <button class="btn btn-outline btn-sm" @click="openAuxTypeModal()">⚙ 类型管理</button>
+          </div>
+          <span style="font-size:13px;color:#999">共 {{auxItems.length}} 项</span>
+        </div>
+        <div class="panel" v-if="auxItems.length">
+          <h3>📋 辅助核算项目</h3>
+          <table><thead><tr><th>编码</th><th>名称</th><th>类型</th><th>联系人</th><th>电话</th><th>操作</th></tr></thead>
+          <tbody><tr v-for="item in auxItems" :key="item.id">
+            <td class="mono">{{item.code||'-'}}</td><td>{{item.name}}</td>
+            <td><span class="tag tag.posted">{{item.type_name}}</span></td>
+            <td>{{item.contact||'-'}}</td><td>{{item.phone||'-'}}</td>
+            <td><button class="btn btn-sm btn-outline" @click="openAuxItemModal(item)">✏️</button>
+            <button class="btn btn-sm btn-danger" @click="deleteAuxItem(item.id)" style="margin-left:4px">🗑</button></td>
+          </tr></tbody></table>
+        </div>
+        <div class="empty" v-else>暂无项目，请先"新增项目"</div>
+        <div class="panel" style="margin-top:16px">
+          <h3>📖 辅助账查询</h3>
+          <div class="toolbar" style="margin-bottom:12px">
+            <div class="filters">
+              <select v-model="auxLedgerFilter.type_id" style="padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:12px">
+                <option value="">全部类型</option><option v-for="t in auxTypes" :value="t.id">{{t.name}}</option>
+              </select>
+              <select v-model="auxLedgerFilter.item_id" style="padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:12px">
+                <option value="">全部项目</option><option v-for="i in auxItems" :value="i.id">{{i.name}}</option>
+              </select>
+              <select v-model="auxLedgerFilter.subject_id" style="padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:12px">
+                <option value="">全部科目</option><option v-for="s in allSubjects" :value="s.id">{{s.code}} {{s.name}}</option>
+              </select>
+              <input v-model="auxLedgerFilter.year" placeholder="年" style="width:60px;padding:6px 8px;font-size:12px">
+              <input v-model="auxLedgerFilter.month" placeholder="月" style="width:48px;padding:6px 8px;font-size:12px">
+              <button class="btn btn-primary btn-sm" @click="loadAuxLedger">🔍 查询</button>
+            </div>
+          </div>
+          <div v-if="auxLedger.items.length" style="margin-bottom:12px;padding:10px 16px;background:#fafafa;border-radius:8px;display:flex;gap:24px">
+            <span style="font-size:13px">📊 结果: <b>{{auxLedger.count}}</b>条</span>
+            <span style="font-size:13px;color:#27ae60">借: <b>¥{{auxLedger.totals.debit}}</b></span>
+            <span style="font-size:13px;color:#e74c3c">贷: <b>¥{{auxLedger.totals.credit}}</b></span>
+          </div>
+          <div v-for="item in auxLedger.items" :key="item.aux_item_id" style="margin-bottom:16px">
+            <h4 style="font-size:14px;margin-bottom:8px;padding:8px 12px;background:#f0f4ff;border-radius:6px">
+              {{item.aux_item_name}} <span style="font-weight:400;font-size:12px;color:#666;margin-left:12px">借{{item.total_debit}}/贷{{item.total_credit}}/余{{item.balance}}</span>
+            </h4>
+            <table><thead><tr><th>科目编码</th><th>科目名称</th><th class="text-right">借方</th><th class="text-right">贷方</th><th class="text-right">余额</th></tr></thead>
+            <tbody><tr v-for="s in item.subjects">
+              <td class="mono">{{s.subject_code}}</td><td>{{s.subject_name}}</td>
+              <td class="text-right mono">{{s.total_debit}}</td><td class="text-right mono">{{s.total_credit}}</td>
+              <td class="text-right mono" :class="Number(s.balance)>=0?'':'row-red'">{{s.balance}}</td>
+            </tr></tbody></table>
+          </div>
+          <details style="margin-top:12px" v-if="auxLedger.details.length">
+            <summary style="cursor:pointer;font-size:13px;color:#666;padding:8px 0">📝 明细 ({{auxLedger.details.length}}条)</summary>
+            <table style="margin-top:8px"><thead><tr><th>日期</th><th>凭证号</th><th>摘要</th><th>科目</th><th>辅助</th><th class="text-right">借方</th><th class="text-right">贷方</th></tr></thead>
+            <tbody><tr v-for="d in auxLedger.details">
+              <td>{{d.voucher_date}}</td><td class="mono">{{d.voucher_no}}</td><td>{{d.description}}</td>
+              <td>{{d.subject_name}}</td><td>{{d.aux_item_name}}</td>
+              <td class="text-right mono">{{d.debit_amount}}</td><td class="text-right mono">{{d.credit_amount}}</td>
+            </tr></tbody></table>
+          </details>
+          <div class="empty" v-else-if="!auxLedger.items.length">请选择筛选条件后查询</div>
+        </div>
+      </div>
+
+
+
+      <!-- ===== 应收应付 ===== -->
+      <div v-show="tab==='arap'">
+        <div class="toolbar no-print"><h3>📊 应收应付管理</h3></div>
+        
+        <!-- 汇总卡片 -->
+        <div class="cards" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+          <div class="card" style="border-left:4px solid #27ae60">
+            <div class="label">📈 应收账款</div>
+            <div class="value" style="font-size:20px">¥{{fmt(arapSummary.ar.balance)}}</div>
+            <div style="font-size:11px;color:#999">应收: ¥{{arapSummary.ar.total}} | 已收: ¥{{arapSummary.ar.paid}} | 已核销: ¥{{arapSummary.ar.reconciled}}</div>
+          </div>
+          <div class="card" style="border-left:4px solid #e74c3c">
+            <div class="label">📉 应付账款</div>
+            <div class="value" style="font-size:20px">¥{{fmt(arapSummary.ap.balance)}}</div>
+            <div style="font-size:11px;color:#999">应付: ¥{{arapSummary.ap.total}} | 已付: ¥{{arapSummary.ap.paid}} | 已核销: ¥{{arapSummary.ap.reconciled}}</div>
+          </div>
+          <div class="card" style="border-left:4px solid #3498db">
+            <div class="label">⚖️ 净头寸</div>
+            <div class="value" style="font-size:20px" :class="arapSummary.net_position>=0?'':'row-red'">¥{{fmt(arapSummary.net_position)}}</div>
+            <div style="font-size:11px;color:#999">客户 {{arapSummary.customer_count}}家 | 供应商 {{arapSummary.supplier_count}}家</div>
+          </div>
+          <div class="card" style="border-left:4px solid #f39c12">
+            <div class="label">📋 未核销</div>
+            <div class="value" style="font-size:20px">{{arapAging.summary.total_outstanding || 0}}</div>
+            <div style="font-size:11px;color:#999">待处理分录</div>
+          </div>
+        </div>
+
+        <!-- Tab: AR / AP -->
+        <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid #eee">
+          <button @click="arapType='ar';loadArApAging('ar')" :style="{padding:'8px 20px',border:'none',background:'none',cursor:'pointer',fontSize:'14px',borderBottom:arapType==='ar'?'3px solid #27ae60':'3px solid transparent',color:arapType==='ar'?'#27ae60':'#999',fontWeight:arapType==='ar'?'bold':'normal'}">📈 应收账款账龄</button>
+          <button @click="arapType='ap';loadArApAging('ap')" :style="{padding:'8px 20px',border:'none',background:'none',cursor:'pointer',fontSize:'14px',borderBottom:arapType==='ap'?'3px solid #e74c3c':'3px solid transparent',color:arapType==='ap'?'#e74c3c':'#999',fontWeight:arapType==='ap'?'bold':'normal'}">📉 应付账款账龄</button>
+          <span style="margin-left:auto;font-size:12px;color:#999;align-self:center">截止: {{arapAging.as_of || '今天'}}</span>
+        </div>
+        
+        <!-- 账龄分析表 -->
+        <div class="panel" v-if="arapAging.buckets">
+          <table style="width:100%">
+            <thead><tr>
+              <th>账龄区间</th>
+              <th class="text-right">金额</th>
+              <th>笔数</th>
+              <th class="text-right">占比</th>
+            </tr></thead>
+            <tbody>
+              <tr v-for="(b,key) in arapAging.buckets" :key="key" 
+                  :style="{background:b.total>0?(key==='365+'?'#fde8e8':key==='181-365'?'#fff3e0':key==='91-180'?'#fffde7':'#f5f5f5'):'transparent'}">
+                <td><b>{{b.label}}</b></td>
+                <td class="text-right mono" :class="b.total>0?'row-red':''">¥{{fmt(b.total)}}</td>
+                <td>{{b.count}}</td>
+                <td class="text-right">{{arapAging.summary.grand_total>0 ? (b.total/arapAging.summary.grand_total*100).toFixed(1)+'%' : '0%'}}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr style="font-weight:bold;border-top:2px solid #333">
+                <td>合计</td>
+                <td class="text-right mono">¥{{fmt(arapAging.summary.grand_total)}}</td>
+                <td>{{arapAging.summary.total_outstanding}}</td>
+                <td>100%</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div class="empty" v-else>暂无{{arapType==='ar'?'应收':'应付'}}账款数据</div>
+
+        <!-- 明细列表 -->
+        <details style="margin-top:16px">
+          <summary style="cursor:pointer;font-size:14px;font-weight:bold;padding:8px 0">
+            📝 明细列表 (点击展开)
+          </summary>
+          <table style="width:100%;margin-top:8px" v-if="arapAging.buckets">
+            <thead><tr>
+              <th>日期</th><th>凭证</th><th>科目</th><th>往来单位</th><th>摘要</th>
+              <th class="text-right">金额</th><th>账龄(天)</th><th>区间</th>
+            </tr></thead>
+            <tbody>
+              <template v-for="b in arapAging.buckets">
+                <tr v-for="item in b.items" :key="item.id">
+                  <td>{{item.voucher_date?.slice(0,10)}}</td>
+                  <td class="mono">{{item.voucher_no}}</td>
+                  <td>{{item.subject_code}} {{item.subject_name}}</td>
+                  <td>{{item.party_name||'-'}}</td>
+                  <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="item.summary">{{item.summary||item.description}}</td>
+                  <td class="text-right mono" :class="item.net>0?'row-red':''">¥{{fmt(item.net)}}</td>
+                  <td class="text-right">{{item.age_days}}</td>
+                  <td><span class="tag" :class="item.age_days>365?'tag-danger':item.age_days>180?'tag-warning':'tag-info'">{{b.label}}</span></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </details>
+      </div>
+
+      <!-- ===== 币种管理 ===== -->
+      <div v-show="tab==='currencies'">
+        <div class="toolbar">
+          <button class="btn btn-primary" @click="openCurrencyModal()">+ 新增币种</button>
+          <span style="font-size:13px;color:#999">共 {{currencies.length}} 种</span>
+        </div>
+        <table v-if="currencies.length">
+          <thead><tr><th>编码</th><th>名称</th><th>符号</th><th>汇率(对CNY)</th><th>操作</th></tr></thead>
+          <tbody><tr v-for="c in currencies" :key="c.id">
+            <td class="mono">{{c.code}}</td><td>{{c.name}}</td>
+            <td class="mono">{{c.symbol}}</td>
+            <td class="text-right mono">{{c.rate}}</td>
+            <td>
+              <button class="btn btn-sm btn-outline" @click="openCurrencyModal(c)">✏️</button>
+              <button class="btn btn-sm btn-danger" @click="deleteCurrency(c.id)" style="margin-left:4px" :disabled="c.code==='CNY'">🗑</button>
+            </td>
+          </tr></tbody></table>
+        <div class="empty" v-else>暂无币种</div>
+      </div>
+
+      <!-- 币种弹窗 -->
+      <div class="modal-mask" v-if="showCurrencyModal" @click.self="showCurrencyModal=false">
+        <div class="modal" style="width:420px">
+          <h3>{{currencyForm.id?'编辑':'新增'}}币种</h3>
+          <div class="form-group"><label>编码 *</label><input type="text" v-model="currencyForm.code" :disabled="!!currencyForm.id" placeholder="如: USD"></div>
+          <div class="form-group"><label>名称 *</label><input type="text" v-model="currencyForm.name" placeholder="如: 美元"></div>
+          <div class="form-group"><label>符号</label><input type="text" v-model="currencyForm.symbol" placeholder="如: $"></div>
+          <div class="form-group"><label>汇率(对CNY)</label><input type="number" step="0.000001" v-model.number="currencyForm.rate" placeholder="如: 7.3"></div>
+          <div class="form-actions">
+            <button class="btn btn-outline" @click="showCurrencyModal=false">取消</button>
+            <button class="btn btn-primary" @click="saveCurrency">{{currencyForm.id?'保存':'添加'}}</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 科目表 ===== -->
+      <div v-show="tab==='subjects'">
+        <div class="panel no-print">
+          <h3>会计科目表（企业会计准则 — 59条）</h3>
+          <p style="color:#999;font-size:13px">科目标准化的，不提供增删改。如需调整请通过数据库管理。</p>
+        </div>
+        <table class="subject-table">
+          <thead><tr><th>编码</th><th>名称</th><th>大类</th><th>方向</th></tr></thead>
+          <tbody>
+            <template v-for="s in allSubjects">
+              <tr><td class="mono lvl1">{{s.code}}</td><td class="lvl1">{{s.name}}</td><td>{{typeLabel(s.type)}}</td><td>{{s.direction==='debit'?'借':'贷'}}</td></tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ===== 账户管理 ===== -->
+        <!-- ===== 银行对账 Tab ===== -->
+  <div v-show="tab==='bankrec'" style="padding:10px">
+    <div style="display:flex;gap:10px;margin-bottom:15px;align-items:center;flex-wrap:wrap">
+      <h3 style="margin:0">🏦 银行对账</h3>
+      <button class="btn btn-primary btn-sm" @click="showBankImport=true">📤 导入对账单</button>
+      <select v-model="bankFilterAccount" @change="loadBankStatements()" style="margin-left:auto;padding:4px 8px"><option :value="null">全部账户</option><option v-for="a in accounts" :value="a.id">{{a.name}}</option></select>
+    </div>
+    <div v-if="showBankImport" class="modal-overlay" @click.self="showBankImport=false">
+      <div class="modal" style="max-width:500px">
+        <div class="modal-header"><h3>📤 导入银行对账单</h3><span class="close" @click="showBankImport=false">&times;</span></div>
+        <div class="modal-body">
+          <div class="form-group"><label>银行账户</label><select v-model="bankImport.account_id"><option v-for="a in accounts" :value="a.id" v-if="a.type==='bank'||a.type==='cash'||a.type==='wechat'||a.type==='alipay'">{{a.name}}</option></select></div>
+          <div class="form-group"><label>对账单日期</label><input type="date" v-model="bankImport.statement_date"></div>
+          <div class="form-group"><label>CSV文件</label><input type="file" accept=".csv" @change="handleBankFile" style="display:block;margin-top:4px"><small style="color:#888">格式: 日期,摘要,收入,支出,余额</small></div>
+          <div v-if="bankImport.preview.length" style="max-height:200px;overflow:auto;background:#f5f5f5;padding:8px;border-radius:4px;font-size:12px;margin-bottom:8px">
+            <div v-for="(p,i) in bankImport.preview.slice(0,5)" :key="i">{{p.transaction_date}} {{p.description}} 支{{p.debit_amount}} 收{{p.credit_amount}} 余{{p.balance}}</div>
+            <div v-if="bankImport.preview.length>5" style="color:#999">...共{{bankImport.preview.length}}条</div>
+          </div>
+          <div class="form-group"><label>备注</label><input type="text" v-model="bankImport.note" placeholder="可选"></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-outline btn-sm" @click="showBankImport=false;bankImport={account_id:2,statement_date:'',csv_content:'',preview:[],note:''}">取消</button><button class="btn btn-primary btn-sm" @click="uploadBankStatement" :disabled="!bankImport.csv_content">导入</button></div>
+      </div>
+    </div>
+    <table class="data-table" v-if="bankStatements.length" style="width:100%">
+      <thead><tr><th>账户</th><th>日期</th><th>明细数</th><th>期初</th><th>期末</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>
+        <tr v-for="s in bankStatements" :key="s.id" :class="{'selected-row':selectedStatement&&selectedStatement.id===s.id}">
+          <td>{{s.account_name}}</td><td>{{s.statement_date?.slice(0,10)}}</td><td>{{s.record_count}}</td>
+          <td class="mono">{{Number(s.opening_balance).toFixed(2)}}</td><td class="mono">{{Number(s.closing_balance).toFixed(2)}}</td>
+          <td><span :class="['tag',s.status==='reconciled'?'tag-success':s.status==='partial'?'tag-warning':'tag-default']">{{statusLabels[s.status]}}</span></td>
+          <td><button class="btn btn-sm btn-primary" @click="viewStatement(s)">对账</button><button class="btn btn-sm btn-danger" @click="deleteStatement(s.id)" style="margin-left:4px">🗑</button></td>
+        </tr>
+      </tbody>
+    </table>
+    <div v-else class="empty" style="padding:30px">暂无对账单，点击"导入对账单"上传 CSV 文件</div>
+    <div v-if="selectedStatement" style="border:1px solid #ddd;border-radius:8px;padding:15px;margin-top:15px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+        <h4 style="margin:0">{{selectedStatement.account_name}} - {{selectedStatement.statement_date?.slice(0,10)}} ({{stmtItems.length}}条)</h4>
+        <div><button class="btn btn-sm btn-outline" @click="autoReconcile(selectedStatement.id)" :disabled="selectedStatement.status==='reconciled'">🔍 自动对账</button><button class="btn btn-sm btn-outline" @click="selectedStatement=null;stmtItems=[]" style="margin-left:4px">&times; 关闭</button></div>
+      </div>
+      <table class="data-table" style="width:100%;font-size:13px">
+        <thead><tr><th>#</th><th>日期</th><th>摘要</th><th>支出</th><th>收入</th><th>余额</th><th>状态</th><th>凭证</th><th>操作</th></tr></thead>
+        <tbody>
+          <tr v-for="it in stmtItems" :key="it.id" :class="{'row-matched':it.match_status==='matched'}">
+            <td>{{it.line_no}}</td><td class="mono">{{it.transaction_date?.slice(0,10)}}</td><td>{{it.description}}</td>
+            <td class="mono">{{Number(it.debit_amount).toFixed(2)}}</td><td class="mono">{{Number(it.credit_amount).toFixed(2)}}</td>
+            <td class="mono">{{Number(it.balance).toFixed(2)}}</td>
+            <td><span :class="['tag',it.match_status==='matched'?'tag-success':'tag-default']">{{it.match_status==='matched'?'已匹配':'未匹配'}}</span></td>
+            <td><span v-if="it.voucher_no" class="tag tag-info">{{it.voucher_no}}</span></td>
+            <td><button v-if="it.match_status!=='matched'" class="btn btn-sm btn-primary" @click="openReconcileModal(it)">匹配</button><button v-else class="btn btn-sm btn-outline" @click="unmatchItem(it)">取消</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div v-if="showReconcileModal" class="modal-overlay" @click.self="showReconcileModal=false">
+      <div class="modal" style="max-width:600px">
+        <div class="modal-header"><h3>手工匹配凭证</h3><span class="close" @click="showReconcileModal=false">&times;</span></div>
+        <div class="modal-body">
+          <div class="form-group"><label>对账单明细</label><div style="background:#f0f7ff;padding:8px;border-radius:4px">{{reconcileItem.transaction_date?.slice(0,10)}} | {{reconcileItem.description}} | 支{{Number(reconcileItem.debit_amount).toFixed(2)}} 收{{Number(reconcileItem.credit_amount).toFixed(2)}}</div></div>
+          <div class="form-group"><label>搜索匹配凭证</label>
+            <div style="display:flex;gap:8px;margin-bottom:8px"><input type="date" v-model="matchSearch.date" style="flex:1"><input type="number" v-model="matchSearch.amount" placeholder="金额" step="0.01" style="flex:1"><button class="btn btn-sm btn-primary" @click="searchCandidates">搜索</button></div>
+            <div v-if="matchCandidates.length" style="max-height:200px;overflow:auto;border:1px solid #ddd;border-radius:4px">
+              <div v-for="c in matchCandidates" :key="c.id" @click="matchVoucher=c" style="padding:8px;cursor:pointer;border-bottom:1px solid #eee" :style="matchVoucher&&matchVoucher.id===c.id?'background:#e3f2fd':''">
+                <strong>{{c.voucher_no}}</strong> {{c.voucher_date?.slice(0,10)}} {{c.summary||c.description}} <span class="mono">借{{Number(c.debit_amount).toFixed(2)}} 贷{{Number(c.credit_amount).toFixed(2)}}</span></div>
+            </div>
+            <div v-else style="color:#999;font-size:12px">输入日期和金额搜索</div></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-outline btn-sm" @click="showReconcileModal=false">取消</button><button class="btn btn-primary btn-sm" @click="doReconcile" :disabled="!matchVoucher">确认匹配</button></div>
+      </div>
+    </div>
+  </div>
+
+    <div v-show="tab==='accounts'">
+        <div class="toolbar no-print"><h3>支付账户</h3><button class="btn btn-primary" @click="openAcctModal()">+ 添加</button></div>
+        <div class="cards" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
+          <div class="card" v-for="a in accounts">
+            <div class="label">{{a.name}} <span style="color:#999">({{typeLabel(a.type)}})</span></div>
+            <div class="value" style="font-size:22px">¥{{fmt(a.balance)}}</div>
+            <div style="font-size:12px;color:#999;margin-top:4px">{{a.note||''}}</div>
+            <button class="btn btn-outline btn-sm" @click="openAcctModal(a)" style="margin-top:8px">✏️ 编辑</button>
+          </div>
+        </div>
+    </div>
+
+
+    <!-- ===== 辅助核算项目弹窗 ===== -->
+    <div class="modal-mask" v-if="showAuxItemModal" @click.self="showAuxItemModal=false">
+      <div class="modal" style="width:540px">
+        <h3>{{auxItemForm.id ? '编辑' : '新增'}}辅助核算项目</h3>
+        <div class="form-group"><label>类型 *</label>
+          <select v-model="auxItemForm.type_id">
+            <option value="">请选择</option>
+            <option v-for="t in auxTypes" :value="t.id">{{t.name}}</option>
+          </select>
+        </div>
+        <div class="form-group"><label>编码 *</label><input type="text" v-model="auxItemForm.code"></div>
+        <div class="form-group"><label>名称 *</label><input type="text" v-model="auxItemForm.name"></div>
+        <div class="form-group"><label>联系人</label><input type="text" v-model="auxItemForm.contact"></div>
+        <div class="form-group"><label>电话</label><input type="text" v-model="auxItemForm.phone"></div>
+        <div class="form-group"><label>地址</label><input type="text" v-model="auxItemForm.address"></div>
+        <div class="form-group"><label>备注</label><input type="text" v-model="auxItemForm.note"></div>
+        <div class="form-actions"><button class="btn btn-outline" @click="showAuxItemModal=false">取消</button><button class="btn btn-primary" @click="saveAuxItem">{{auxItemForm.id?'保存':'添加'}}</button></div>
+      </div>
+    </div>
+
+    <!-- ===== 辅助核算类型弹窗 ===== -->
+    <div class="modal-mask" v-if="showAuxTypeModal" @click.self="showAuxTypeModal=false">
+      <div class="modal" style="width:480px">
+        <h3>{{auxTypeForm.id ? '编辑' : '新增'}}辅助核算类型</h3>
+        <div class="form-group"><label>编码 *</label><input type="text" v-model="auxTypeForm.code"></div>
+        <div class="form-group"><label>名称 *</label><input type="text" v-model="auxTypeForm.name"></div>
+        <div class="form-group"><label>描述</label><input type="text" v-model="auxTypeForm.description"></div>
+        <div class="form-group"><label>排序</label><input type="number" v-model="auxTypeForm.sort_order"></div>
+        <div class="form-actions"><button class="btn btn-outline" @click="showAuxTypeModal=false">取消</button><button class="btn btn-primary" @click="saveAuxType">{{auxTypeForm.id?'保存':'添加'}}</button></div>
+      </div>
+    </div>
+
+    <!-- ===== 账户弹窗 ===== -->
+    <div class="modal-mask" v-if="showAcctModal" @click.self="showAcctModal=false">
+      <div class="modal" style="width:480px">
+        <h3>{{acctForm.id ? '编辑' : '新增'}}账户</h3>
+        <div class="form-group"><label>名称 *</label><input type="text" v-model="acctForm.name"></div>
+        <div class="form-group"><label>类型</label><select v-model="acctForm.type"><option value="cash">现金</option><option value="bank">银行卡</option><option value="wechat">微信支付</option><option value="alipay">支付宝</option><option value="other">其他</option></select></div>
+        <div class="form-group"><label>余额</label><input type="number" step="0.01" v-model="acctForm.balance"></div>
+        <div class="form-group"><label>备注</label><input type="text" v-model="acctForm.note"></div>
+        <div class="form-actions"><button class="btn btn-outline" @click="showAcctModal=false">取消</button><button class="btn btn-primary" @click="saveAcct">{{acctForm.id?'保存':'添加'}}</button></div>
+      </div>
+    </div>
+  </div>
+
+
+    <!-- ===== 用户管理 ===== -->
+    <div v-show="tab==='users'" style="padding:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="margin:0">👥 用户管理</h3>
+        <button @click="showAddUser=true" style="background:#9b59b6;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer">+ 添加用户</button>
+      </div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:#f5f5f5">
+          <th style="padding:10px;text-align:left;border-bottom:2px solid #ddd">ID</th>
+          <th style="padding:10px;text-align:left;border-bottom:2px solid #ddd">用户名</th>
+          <th style="padding:10px;text-align:left;border-bottom:2px solid #ddd">角色</th>
+          <th style="padding:10px;text-align:left;border-bottom:2px solid #ddd">创建时间</th>
+          <th style="padding:10px;text-align:left;border-bottom:2px solid #ddd">最后登录</th>
+          <th style="padding:10px;text-align:left;border-bottom:2px solid #ddd">操作</th>
+        </tr></thead>
+        <tbody>
+          <tr v-for="u in admins" :key="u.id" style="border-bottom:1px solid #eee">
+            <td style="padding:10px">{{u.id}}</td>
+            <td style="padding:10px">{{u.username}}</td>
+            <td style="padding:10px">
+              <select v-model="u.role" @change="updateAdminRole(u)" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px" :disabled="u.id===1&&userRole!=='super_admin'">
+                <option value="super_admin">超级管理员</option>
+                <option value="admin">管理员</option>
+                <option value="accountant">会计</option>
+                <option value="viewer">阅览者</option>
+              </select>
+            </td>
+            <td style="padding:10px;font-size:12px;color:#666">{{fmtTime(u.created_at)}}</td>
+            <td style="padding:10px;font-size:12px;color:#666">{{fmtTime(u.last_login)||'未登录'}}</td>
+            <td style="padding:10px">
+              <button @click="deleteAdmin(u)" style="background:#e74c3c;color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px" :disabled="u.id===1">删除</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+
+      <!-- ===== 账套管理 ===== -->
+      <div v-show="tab==='accountSets'">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h3 style="margin:0">📁 账套管理</h3>
+          <button @click="newAccountSet" class="btn btn-primary btn-sm">+ 新建账套</button>
+        </div>
+        <table class="tbl" style="width:100%">
+          <thead><tr><th>ID</th><th>名称</th><th>公司</th><th>年度</th><th>期间</th><th>本位币</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr v-for="a in accountSets" :key="a.id" :class="{'bg-yellow':a.id===currentAsId}">
+              <td>{{a.id}}</td>
+              <td><strong>{{a.name}}</strong> <span v-if="a.id===currentAsId" style="color:#e74c3c;font-size:11px">← 当前</span></td>
+              <td>{{a.company||'-'}}</td>
+              <td>{{a.year}}</td>
+              <td>{{a.start_date?.slice(0,10)}} ~ {{a.end_date?.slice(0,10)}}</td>
+              <td>{{a.currency||'CNY'}}</td>
+              <td>{{a.is_active?'✅ 启用':'❌ 停用'}}</td>
+              <td>
+                <button @click="editAccountSet(a)" class="btn btn-outline btn-sm">✏️</button>
+                <button v-if="a.id!==1" @click="deleteAccountSet(a.id)" class="btn btn-outline btn-sm" style="color:#e74c3c">🗑️</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-show="tab==='tax'" style="max-width:1280px;margin:0 auto;padding:20px">
+        <!-- 税务头部工具栏 -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+          <h3 style="margin:0">📊 税务看板</h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select v-model="taxYear" @change="loadTaxDashboard()" style="padding:6px 12px;border-radius:6px;border:1px solid #dadce0;font-size:14px">
+              <option v-for="y in taxYearOptions" :value="y">{{ y }}年</option>
+            </select>
+            <select v-model="taxMonth" @change="loadTaxDashboard()" style="padding:6px 12px;border-radius:6px;border:1px solid #dadce0;font-size:14px">
+              <option v-for="m in 12" :value="m">{{ m }}月</option>
+            </select>
+            <button @click="exportTaxCSV" style="padding:6px 14px;background:linear-gradient(135deg,#1a73e8,#4285f4);color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">📥 导出申报表</button>
+          </div>
+        </div>
+
+        <!-- 加载中 -->
+        <div v-if="taxLoading && !taxLoadErr" class="tax-loading" v-cloak><p>计算中…</p></div>
+        <div v-if="taxLoadErr" class="tax-empty" v-cloak><p style="font-size:16px;color:#ea4335">{{ taxLoadErr }}</p><button @click="loadTaxDashboard()" style="margin-top:12px;padding:10px 24px;background:#1a73e8;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px">🔄 重试</button></div>
+
+        <!-- 主内容 -->
+        <template v-if="!taxLoading && !taxLoadErr">
+          <!-- 总览卡片 -->
+          <div class="tax-summary-cards">
+            <div class="tax-card">
+              <div class="tax-card-label">📌 应纳增值税</div>
+              <div class="tax-card-amount tax-amt-vat">¥{{ fmt(taxSummary?.vat?.payable || 0) }}</div>
+              <div class="tax-card-detail">销项 ¥{{ fmt(taxSummary?.vat?.output || 0) }} · 进项 ¥{{ fmt(taxSummary?.vat?.input || 0) }}</div>
+            </div>
+            <div class="tax-card">
+              <div class="tax-card-label">🏛️ 企业所得税（本季）</div>
+              <div class="tax-card-amount tax-amt-cit">¥{{ fmt(taxCit?.cit_payable || 0) }}</div>
+              <div class="tax-card-detail">累计利润 ¥{{ fmt(taxCit?.ytd_profit || 0) }} · 优惠 {{ taxCit?.tax_reduction > 0 ? '已享受' : '-' }}</div>
+            </div>
+            <div class="tax-card">
+              <div class="tax-card-label">📋 附加税</div>
+              <div class="tax-card-amount tax-amt-surtax">¥{{ fmt(taxSurtaxTotal) }}</div>
+              <div class="tax-card-detail">城建 ¥{{ fmt(taxSurtax?.urban?.amount || 0) }} · 教育 ¥{{ fmt(taxSurtax?.edu?.amount || 0) }} · 地方 ¥{{ fmt(taxSurtax?.local?.amount || 0) }}</div>
+            </div>
+            <div class="tax-card">
+              <div class="tax-card-label">💰 本月合计</div>
+              <div class="tax-card-amount tax-amt-total">¥{{ fmt(taxGrandTotal) }}</div>
+              <div class="tax-card-detail">{{ taxYear }}年{{ taxMonth }}月</div>
+            </div>
+          </div>
+
+          <!-- 双栏面板 -->
+          <div class="tax-panels">
+            <div class="tax-panel">
+              <div class="tax-panel-header">
+                增值税明细
+                <span class="tax-badge tax-badge-blue">{{ vatBreakdown.length }} 个科目</span>
+              </div>
+              <div class="tax-panel-body">
+                <table v-if="vatBreakdown.length" class="tbl" style="width:100%">
+                  <thead><tr><th>科目编码</th><th>科目</th><th>金额</th><th>税率</th><th>税额</th></tr></thead>
+                  <tbody>
+                    <tr v-for="(item, i) in vatBreakdown" :key="i">
+                      <td>{{ item.code }}</td>
+                      <td>{{ item.name }}</td>
+                      <td>¥{{ fmt(item.amount) }}</td>
+                      <td><span class="tax-badge tax-badge-blue">{{ (item.rate * 100).toFixed(1) }}%</span></td>
+                      <td style="color:#1a73e8;font-weight:600">¥{{ fmt(item.tax) }}</td>
+                    </tr>
+                    <tr class="tax-total-row"><td colspan="4">合计</td><td style="color:#1a73e8">¥{{ fmt(vatBreakdown.reduce((s,x)=>s+x.tax,0)) }}</td></tr>
+                  </tbody>
+                </table>
+                <div v-else class="tax-empty">本月无增值税相关交易</div>
+              </div>
+            </div>
+            <div class="tax-panel">
+              <div class="tax-panel-header">
+                附加税 & 印花税
+                <span class="tax-badge tax-badge-orange">{{ surtaxItems.length }} 项</span>
+              </div>
+              <div class="tax-panel-body">
+                <table v-if="surtaxItems.length" class="tbl" style="width:100%">
+                  <thead><tr><th>税种</th><th>计税依据</th><th>税率</th><th>应纳税额</th></tr></thead>
+                  <tbody>
+                    <tr v-for="(item, i) in surtaxItems" :key="i">
+                      <td>{{ item.name }}</td>
+                      <td>¥{{ fmt(item.base) }}</td>
+                      <td><span class="tax-badge tax-badge-orange">{{ (item.rate * 100).toFixed(1) }}%</span></td>
+                      <td style="font-weight:600;color:#f9ab00">¥{{ fmt(item.amount) }}</td>
+                    </tr>
+                    <tr class="tax-total-row"><td colspan="3">合计</td><td style="color:#f9ab00">¥{{ fmt(taxSurtaxTotal) }}</td></tr>
+                  </tbody>
+                </table>
+                <div v-else class="tax-empty">本月无附加税数据</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 企业所得税面板 -->
+          <div class="tax-panel" style="margin-bottom:20px">
+            <div class="tax-panel-header">
+              企业所得税（{{ taxYear }}年 Q{{ taxCitQuarter }}）
+              <span :class="'tax-badge ' + (taxCit?.is_small_micro ? 'tax-badge-green' : 'tax-badge-red')">{{ taxCit?.is_small_micro ? '小微企业' : '一般企业' }}</span>
+            </div>
+            <div class="tax-panel-body">
+              <table v-if="taxCit" class="tbl" style="width:100%">
+                <tbody>
+                  <tr><td>营业收入（本季）</td><td style="text-align:right;font-weight:600">¥{{ fmt(taxCit.revenue || 0) }}</td></tr>
+                  <tr><td>营业成本（本季）</td><td style="text-align:right">¥{{ fmt(taxCit.cost || 0) }}</td></tr>
+                  <tr><td>期间费用（本季）</td><td style="text-align:right">¥{{ fmt(taxCit.expense || 0) }}</td></tr>
+                  <tr style="background:#f8f9fa"><td>季度利润</td><td style="text-align:right;font-weight:700;color:#ea4335">¥{{ fmt(taxCit.period_profit || 0) }}</td></tr>
+                  <tr><td>年初至今累计利润</td><td style="text-align:right;font-weight:700;color:#ea4335">¥{{ fmt(taxCit.ytd_profit || 0) }}</td></tr>
+                  <tr><td>适用税率</td><td style="text-align:right">{{ (taxCit.tax_rate * 100).toFixed(1) }}%</td></tr>
+                  <tr v-if="taxCit.tax_reduction > 0" style="background:#fff3e0"><td>税收优惠减免</td><td style="text-align:right;color:#f9ab00">-¥{{ fmt(taxCit.tax_reduction) }}</td></tr>
+                  <tr style="background:#fce8e6;font-size:16px"><td>应预缴所得税</td><td style="text-align:right;font-weight:700;color:#ea4335">¥{{ fmt(taxCit.cit_payable || 0) }}</td></tr>
+                </tbody>
+              </table>
+              <div v-else class="tax-empty">暂无企业所得税数据</div>
+            </div>
+          </div>
+
+          <!-- 月度税收趋势 -->
+          <div class="tax-panel">
+            <div class="tax-panel-header">
+              月度税收趋势
+              <span class="tax-badge tax-badge-green">近 12 个月</span>
+            </div>
+            <div class="tax-panel-body">
+              <div v-if="trendData.length" class="tax-chart-bars">
+                <div class="tax-chart-col" v-for="(d, i) in trendData" :key="i">
+                  <div class="tax-chart-bar" :style="{height: taxMaxTrend > 0 ? (d.total / taxMaxTrend * 160) + 'px' : '0px', background: i === trendData.length - 1 ? 'var(--primary)' : '#c4d7f2'}" :title="d.label + ': ¥' + fmt(d.total)">
+                    <span class="tax-chart-tip">¥{{ fmt(d.total) }}</span>
+                  </div>
+                  <div class="tax-chart-label">{{ d.label.slice(5) }}</div>
+                </div>
+              </div>
+              <div v-else class="tax-empty">暂无趋势数据</div>
+            </div>
+          </div>
+
+          <!-- 税率设置 -->
+          <div class="tax-panel" style="margin-top:20px;margin-bottom:20px">
+            <div class="tax-panel-header">
+              ⚙️ 税率设置
+              <button @click="saveTaxSettings" style="padding:6px 16px;background:#1a73e8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">保存</button>
+            </div>
+            <div class="tax-panel-body">
+              <div class="tax-rate-row" v-for="s in taxSettings" :key="s.id">
+                <span class="tax-rate-name">{{ s.tax_name }}</span>
+                <span style="color:#5f6368;font-size:12px">{{ s.tax_key }}</span>
+                <input type="number" v-model.number="s.rate" step="0.0001" min="0" max="1" class="tax-rate-input">
+                <span class="tax-rate-val">{{ (s.rate * 100).toFixed(1) }}%</span>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+
+    
+<!-- ===== 固定资产面板 ===== -->
+<!-- 固定资产面板 -->
+<div v-show="tab==='fixed_assets'" style="max-width:1280px;margin:0 auto;padding:20px">
+  <!-- 顶部操作栏 -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div>
+      <h2 style="margin:0;font-size:20px">🏢 固定资产管理</h2>
+      <span style="color:#888;font-size:13px">{{faList.length}} 项资产 · 净值合计 ¥{{fmt(faTotalNet)}}</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <input v-model="faSearch" @input="adjustFaPage()" placeholder="搜索名称/编号..." style="padding:6px 12px;border:1px solid #dadce0;border-radius:6px;width:200px;font-size:13px">
+      <select v-model="faStatusFilter" @change="adjustFaPage()" style="padding:6px 12px;border:1px solid #dadce0;border-radius:6px;font-size:13px">
+        <option value="">全部状态</option>
+        <option value="in_use">使用中</option>
+        <option value="idle">闲置</option>
+        <option value="disposed">已处置</option>
+        <option value="scrapped">已报废</option>
+      </select>
+      <button @click="showFaCreate=true;clearFaForm()" style="background:linear-gradient(135deg,#1a73e8,#4285f4);color:#fff;border:none;padding:8px 18px;border-radius:6px;font-size:13px;cursor:pointer">➕ 新增资产</button>
+      <button @click="runDepreciation" :disabled="faDepLoading" style="background:linear-gradient(135deg,#e67e22,#f39c12);color:#fff;border:none;padding:8px 18px;border-radius:6px;font-size:13px;cursor:pointer">{{faDepLoading ? '⏳ 计提中...' : '📅 计提折旧'}}</button>
+    </div>
+  </div>
+
+  <!-- 汇总卡片 -->
+  <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+    <div style="flex:1;min-width:200px;background:#f0f7ff;border-radius:10px;padding:14px;border:1px solid #d2e3fc">
+      <div style="color:#1967d2;font-size:12px;margin-bottom:4px">资产原值</div>
+      <div style="font-size:22px;font-weight:700;color:#1a73e8">¥{{fmt(faTotalOriginal)}}</div>
+    </div>
+    <div style="flex:1;min-width:200px;background:#fff8e1;border-radius:10px;padding:14px;border:1px solid #fde293">
+      <div style="color:#e37400;font-size:12px;margin-bottom:4px">累计折旧</div>
+      <div style="font-size:22px;font-weight:700;color:#e67e22">¥{{fmt(faTotalAccumulated)}}</div>
+    </div>
+    <div style="flex:1;min-width:200px;background:#e8f5e9;border-radius:10px;padding:14px;border:1px solid #c8e6c9">
+      <div style="color:#1e8e3e;font-size:12px;margin-bottom:4px">资产净值</div>
+      <div style="font-size:22px;font-weight:700;color:#188038">¥{{fmt(faTotalNet)}}</div>
+    </div>
+    <div style="flex:1;min-width:200px;background:#fce4ec;border-radius:10px;padding:14px;border:1px solid #f8bbd0">
+      <div style="color:#c62828;font-size:12px;margin-bottom:4px">月折旧额</div>
+      <div style="font-size:22px;font-weight:700;color:#e74c3c">¥{{fmt(faTotalMonthly)}}</div>
+    </div>
+  </div>
+
+  <!-- 资产列表表格 -->
+  <div style="overflow-x:auto">
+    <table class="tbl" style="width:100%">
+      <thead>
+        <tr>
+          <th>资产编号</th>
+          <th>名称</th>
+          <th>分类</th>
+          <th>科目</th>
+          <th>购入日期</th>
+          <th style="text-align:right">原值</th>
+          <th style="text-align:right">月折旧</th>
+          <th style="text-align:right">累计折旧</th>
+          <th style="text-align:right">净值</th>
+          <th style="text-align:right">残值率</th>
+          <th>状态</th>
+          <th>部门</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="fa in faFilteredList" :key="fa.id" :class="fa.status==='scrapped'||fa.status==='disposed'?'row-dimmed':''">
+          <td><code>{{fa.asset_code}}</code></td>
+          <td><strong>{{fa.asset_name}}</strong></td>
+          <td>{{faCategoryLabel(fa.category)}}</td>
+          <td><span class="tag">{{fa.subject_code}} {{fa.subject_name}}</span></td>
+          <td>{{fa.purchase_date?.slice(0,10)}}</td>
+          <td style="text-align:right;font-family:monospace;font-weight:600">¥{{fmt(fa.original_value)}}</td>
+          <td style="text-align:right;font-family:monospace">¥{{fmt(fa.monthly_depreciation)}}</td>
+          <td style="text-align:right;font-family:monospace;color:#e67e22">¥{{fmt(fa.accumulated_depreciation)}}</td>
+          <td style="text-align:right;font-family:monospace;font-weight:700" :style="fa.net_value>=0?'color:#188038':'color:#e74c3c'">¥{{fmt(fa.net_value)}}</td>
+          <td style="text-align:right">{{(fa.residual_rate*100).toFixed(1)}}%</td>
+          <td><span :class="'tag tag-' + fa.status">{{faStatusLabel(fa.status)}}</span></td>
+          <td>{{fa.department || '-'}}</td>
+          <td>
+            <button @click="editFa(fa)" class="btn-outline btn-sm" style="padding:2px 8px;font-size:12px">✏️</button>
+            <button v-if="fa.accumulated_depreciation==0" @click="deleteFa(fa.id)" class="btn-danger btn-sm" style="padding:2px 8px;font-size:12px;margin-left:4px">🗑</button>
+          </td>
+        </tr>
+        <tr v-if="faFilteredList.length===0">
+          <td colspan="13" style="text-align:center;padding:40px;color:#888">
+            <div style="font-size:48px;margin-bottom:12px">🏢</div>
+            <p>暂无资产{{faSearch||faStatusFilter?'匹配条件':'，点击"新增资产"开始'}}</p>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 折旧记录 -->
+  <div style="margin-top:24px" v-if="faDetail">
+    <h3 style="font-size:16px;margin-bottom:12px">
+      📅 折旧记录 — {{faDetail.asset_name}} ({{faDetail.asset_code}})
+      <button @click="faDetail=null" style="margin-left:12px;font-size:12px;color:#888;cursor:pointer;background:none;border:none">✕ 关闭</button>
+    </h3>
+    <table class="tbl" style="width:100%">
+      <thead><tr><th>期间</th><th style="text-align:right">折旧金额</th><th>凭证号</th><th>计提日期</th></tr></thead>
+      <tbody>
+        <tr v-for="d in faDetail.depreciation_records" :key="d.id">
+          <td>{{d.period_year}}-{{String(d.period_month).padStart(2,'0')}}</td>
+          <td style="text-align:right;font-family:monospace">¥{{fmt(d.depreciation_amount)}}</td>
+          <td><code>{{d.voucher_no || '-'}}</code></td>
+          <td>{{d.created_at?.slice(0,10)}}</td>
+        </tr>
+        <tr v-if="!faDetail.depreciation_records||faDetail.depreciation_records.length===0">
+          <td colspan="4" style="text-align:center;color:#888;padding:20px">暂无折旧记录</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 创建/编辑弹窗 -->
+  <div v-if="showFaCreate" class="modal-overlay" @click.self="showFaCreate=false">
+    <div class="modal" style="max-width:560px">
+      <div class="modal-title">{{editingFaId?'✏️ 编辑资产':'➕ 新增固定资产'}}</div>
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label>资产名称 *</label>
+            <input v-model="faForm.asset_name" class="form-input" :disabled="editingFaId&&faForm.accumulated_depreciation>0" placeholder="例: Dell笔记本">
+          </div>
+          <div class="form-group">
+            <label>分类</label>
+            <select v-model="faForm.category" class="form-input">
+              <option value="electronic">电子设备</option>
+              <option value="office">办公设备</option>
+              <option value="building">建筑物</option>
+              <option value="vehicle">车辆</option>
+              <option value="other">其他</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>资产科目 *</label>
+            <select v-model="faForm.subject_id" class="form-input">
+              <option v-for="s in fixedAssetSubjects" :value="s.id">{{s.code}} {{s.name}}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>折旧科目</label>
+            <select v-model="faForm.dep_subject_id" class="form-input">
+              <option :value="null">默认(折旧费)</option>
+              <option v-for="s in faDepSubjects" :value="s.id">{{s.code}} {{s.name}}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>购入日期 *</label>
+            <input v-model="faForm.purchase_date" type="date" class="form-input">
+          </div>
+          <div class="form-group">
+            <label>原值 (¥) *</label>
+            <input v-model.number="faForm.original_value" type="number" step="0.01" class="form-input" placeholder="0.00" :disabled="editingFaId&&faForm.accumulated_depreciation>0" @change="calcFaDep">
+          </div>
+          <div class="form-group">
+            <label>使用年限 (月) *</label>
+            <input v-model.number="faForm.useful_life" type="number" class="form-input" placeholder="36" :disabled="editingFaId&&faForm.accumulated_depreciation>0" @change="calcFaDep">
+          </div>
+          <div class="form-group">
+            <label>残值率</label>
+            <input v-model.number="faForm.residual_rate" type="number" step="0.0001" class="form-input" placeholder="0.05" :disabled="editingFaId&&faForm.accumulated_depreciation>0" @change="calcFaDep">
+          </div>
+          <div class="form-group">
+            <label>存放位置</label>
+            <input v-model="faForm.location" class="form-input" placeholder="办公室A">
+          </div>
+          <div class="form-group">
+            <label>使用部门</label>
+            <input v-model="faForm.department" class="form-input" placeholder="技术部">
+          </div>
+          <div class="form-group">
+            <label>责任人</label>
+            <input v-model="faForm.responsible_person" class="form-input" placeholder="张三">
+          </div>
+          <div class="form-group">
+            <label>状态</label>
+            <select v-model="faForm.status" class="form-input">
+              <option value="in_use">使用中</option>
+              <option value="idle">闲置</option>
+              <option value="disposed">已处置</option>
+              <option value="scrapped">已报废</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:12px">
+          <label>备注</label>
+          <textarea v-model="faForm.notes" class="form-input" rows="2"></textarea>
+        </div>
+        <!-- 月折旧预览 -->
+        <div v-if="faForm.original_value>0&&faForm.useful_life>0" style="background:#f8f9fa;padding:10px;border-radius:6px;margin-top:8px">
+          <span style="font-size:13px;color:#666">预计月折旧: </span>
+          <span style="font-weight:700;font-family:monospace;color:#e67e22">¥{{fmt((faForm.original_value*(1-(faForm.residual_rate||0.05)))/(faForm.useful_life||1))}}/月</span>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button @click="showFaCreate=false" class="btn-cancel">取消</button>
+        <button @click="saveFa" class="btn-primary">{{editingFaId?'更新':'创建'}}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 折旧计提确认弹窗 -->
+  <div v-if="showFaDepConfirm" class="modal-overlay" @click.self="showFaDepConfirm=false">
+    <div class="modal" style="max-width:480px">
+      <div class="modal-title">📅 计提折旧确认</div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>计提年度</label>
+          <input v-model.number="faDepYear" type="number" class="form-input" style="width:120px">
+        </div>
+        <div class="form-group">
+          <label>计提月份</label>
+          <select v-model.number="faDepMonth" class="form-input" style="width:120px">
+            <option v-for="m in 12" :value="m">{{m}}月</option>
+          </select>
+        </div>
+        <div style="background:#fff8e1;padding:12px;border-radius:8px;margin-top:12px">
+          <div style="font-size:13px;color:#e37400">将自动为所有使用中的未完全折旧资产计提折旧，并生成对应的折旧凭证。</div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button @click="showFaDepConfirm=false" class="btn-cancel">取消</button>
+        <button @click="doDepreciation" class="btn-primary">确认计提</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 库存管理面板 ===== -->
+<div v-show="tab==='inventory'" style="max-width:1280px;margin:0 auto;padding:20px">
+  <!-- 顶部操作栏 -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h2 style="margin:0;font-size:20px">📦 库存管理</h2>
+    <div style="display:flex;gap:10px">
+      <input v-model="invSearch" placeholder="搜索名称/编码..." @input="loadInventory()" class="form-input" style="width:200px">
+      <select v-model="invCategoryFilter" @change="loadInventory()" class="form-input" style="width:130px">
+        <option value="">全部分类</option>
+        <option value="raw_material">原材料</option>
+        <option value="semi_finished">半成品</option>
+        <option value="finished_goods">产成品</option>
+        <option value="packaging">包装物</option>
+        <option value="consumable">低值易耗品</option>
+      </select>
+      <button v-if="userRole!=='viewer'" class="btn-primary" @click="openInvForm()" style="white-space:nowrap">➕ 新增存货</button>
+      <button class="btn-outline" @click="loadInvBalance()" style="white-space:nowrap">📊 收发存表</button>
+    </div>
+  </div>
+
+  <!-- 汇总卡片 -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px">
+    <div class="stat-card" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)">
+      <div class="stat-card-label">📋 存货种类</div>
+      <div class="stat-card-value" style="color:#1565c0">{{ invSummary.itemCount }}</div>
+    </div>
+    <div class="stat-card" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9)">
+      <div class="stat-card-label">💰 库存总值</div>
+      <div class="stat-card-value" style="color:#2e7d32">¥{{ fmt(invSummary.totalValue) }}</div>
+    </div>
+    <div class="stat-card" style="background:linear-gradient(135deg,#fff3e0,#ffe0b2)">
+      <div class="stat-card-label">⚠️ 库存预警</div>
+      <div class="stat-card-value" style="color:#e65100">{{ invSummary.alertCount }}</div>
+      <div class="stat-card-detail" style="font-size:11px;color:#bf360c">低于安全库存</div>
+    </div>
+    <div class="stat-card" style="background:linear-gradient(135deg,#fce4ec,#f8bbd0)">
+      <div class="stat-card-label">🛑 零库存</div>
+      <div class="stat-card-value" style="color:#c62828">{{ invSummary.zeroStockCount }}</div>
+    </div>
+  </div>
+
+  <!-- 存货列表 -->
+  <div class="panel">
+    <table class="tbl" style="width:100%">
+      <thead>
+        <tr>
+          <th>编码</th><th>名称</th><th>分类</th><th>规格</th><th>单位</th>
+          <th style="text-align:right">单价</th><th style="text-align:right">库存</th><th style="text-align:right">安全库存</th>
+          <th>科目</th><th style="text-align:center">状态</th><th style="text-align:center">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="item in invItems" :key="item.id" :style="{background: Number(item.current_stock) <= Number(item.safety_stock) && Number(item.current_stock) > 0 ? '#fff8e1' : Number(item.current_stock) <= 0 ? '#ffebee' : ''}">
+          <td style="font-family:monospace;font-weight:600">{{ item.item_code }}</td>
+          <td>{{ item.item_name }}</td>
+          <td><span class="inv-cat-tag" :class="'inv-cat-' + item.category">{{ invCatLabel(item.category) }}</span></td>
+          <td>{{ item.spec || '-' }}</td>
+          <td>{{ item.unit }}</td>
+          <td style="text-align:right">¥{{ fmt(item.unit_price) }}</td>
+          <td style="text-align:right;font-weight:700" :style="{color: Number(item.current_stock) <= Number(item.safety_stock) ? '#e65100' : Number(item.current_stock) <= 0 ? '#c62828' : '#2e7d32'}">{{ fmtQty(item.current_stock) }}</td>
+          <td style="text-align:right;color:#888">{{ fmtQty(item.safety_stock) }}</td>
+          <td style="font-size:12px">{{ item.subject_code || '-' }} {{ item.subject_name ? item.subject_name.slice(0,6) : '' }}</td>
+          <td style="text-align:center">
+            <span v-if="Number(item.current_stock) <= 0" class="badge badge-danger">缺货</span>
+            <span v-else-if="Number(item.current_stock) <= Number(item.safety_stock)" class="badge badge-warning">预警</span>
+            <span v-else-if="item.is_active != 1" class="badge badge-muted">已停用</span>
+            <span v-else class="badge badge-success">正常</span>
+          </td>
+          <td style="text-align:center;white-space:nowrap">
+            <button v-if="userRole!=='viewer'" class="btn-xs btn-outline" @click="openStockIn(item)" title="入库">📥</button>
+            <button v-if="userRole!=='viewer'" class="btn-xs btn-outline" @click="openStockOut(item)" title="出库" :disabled="Number(item.current_stock) <= 0" style="margin-left:2px">📤</button>
+            <button class="btn-xs btn-outline" @click="loadInvTransactions(item)" title="流水" style="margin-left:2px">📜</button>
+            <button v-if="userRole!=='viewer'" class="btn-xs btn-outline" @click="editInvItem(item)" title="编辑" style="margin-left:2px">✏️</button>
+          </td>
+        </tr>
+        <tr v-if="invItems.length===0">
+          <td colspan="11" style="text-align:center;padding:30px;color:#999">暂无存货数据，请新增</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 新增/编辑弹窗 -->
+  <div v-if="invShowForm" class="modal-overlay" @click.self="invShowForm=false">
+    <div class="modal" style="max-width:560px">
+      <div class="modal-title">{{ editingInvId ? '✏️ 编辑存货' : '➕ 新增存货' }}</div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group" style="flex:1"><label>存货名称 *</label><input v-model="invForm.item_name" class="form-input" placeholder="如：螺丝、钢板"></div>
+          <div class="form-group" style="flex:1"><label>分类</label>
+            <select v-model="invForm.category" class="form-input">
+              <option value="raw_material">原材料</option><option value="semi_finished">半成品</option>
+              <option value="finished_goods">产成品</option><option value="packaging">包装物</option>
+              <option value="consumable">低值易耗品</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="flex:1"><label>规格型号</label><input v-model="invForm.spec" class="form-input"></div>
+          <div class="form-group" style="flex:1"><label>计量单位</label><input v-model="invForm.unit" class="form-input" placeholder="个/kg/箱"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="flex:1"><label>参考单价 (¥)</label><input v-model.number="invForm.unit_price" type="number" step="0.01" class="form-input"></div>
+          <div class="form-group" style="flex:1"><label>安全库存</label><input v-model.number="invForm.safety_stock" type="number" step="0.01" class="form-input" placeholder="预警阈值"></div>
+        </div>
+        <div class="form-group"><label>关联科目</label>
+          <select v-model="invForm.subject_id" class="form-input">
+            <option v-for="s in invSubjects" :value="s.id">{{ s.code }} {{ s.name }}</option>
+          </select>
+        </div>
+        <div class="form-group"><label>备注</label><textarea v-model="invForm.notes" class="form-input" rows="2"></textarea></div>
+      </div>
+      <div class="modal-actions">
+        <button @click="invShowForm=false" class="btn-cancel">取消</button>
+        <button @click="saveInvItem" class="btn-primary">{{ editingInvId ? '保存' : '创建' }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 入库弹窗 -->
+  <div v-if="invShowStockIn" class="modal-overlay" @click.self="invShowStockIn=false">
+    <div class="modal" style="max-width:500px">
+      <div class="modal-title">📥 入库 — {{ invStockTarget.item_name }}</div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group" style="flex:1"><label>数量 *</label><input v-model.number="invStockForm.quantity" type="number" step="0.01" min="0.01" class="form-input"></div>
+          <div class="form-group" style="flex:1"><label>单价 (¥) *</label><input v-model.number="invStockForm.unit_cost" type="number" step="0.01" min="0.01" class="form-input"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="flex:1"><label>日期 *</label><input v-model="invStockForm.voucher_date" type="date" class="form-input"></div>
+          <div class="form-group" style="flex:1"><label>批次号</label><input v-model="invStockForm.batch_no" class="form-input"></div>
+        </div>
+        <div class="form-group"><label>编号/参考</label><input v-model="invStockForm.reference" class="form-input" placeholder="采购单号等"></div>
+        <div class="form-group"><label>备注</label><input v-model="invStockForm.notes" class="form-input"></div>
+        <div class="form-group"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" v-model="invStockForm.is_posted">自动生成入库凭证</label></div>
+        <div v-if="invStockMsg" :style="{padding:'8px 12px',borderRadius:'6px',marginTop:'8px',background: invStockMsg.indexOf('成功')>=0?'#e8f5e9':'#ffebee',color: invStockMsg.indexOf('成功')>=0?'#2e7d32':'#c62828'}">{{ invStockMsg }}</div>
+      </div>
+      <div class="modal-actions">
+        <button @click="invShowStockIn=false" class="btn-cancel">关闭</button>
+        <button @click="doStockIn" class="btn-primary">确认入库</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 出库弹窗 -->
+  <div v-if="invShowStockOut" class="modal-overlay" @click.self="invShowStockOut=false">
+    <div class="modal" style="max-width:500px">
+      <div class="modal-title">📤 出库 — {{ invStockTarget.item_name }} <span style="font-size:13px;color:#888">(当前库存 {{ fmtQty(invStockTarget.current_stock) }}{{ invStockTarget.unit }})</span></div>
+      <div class="modal-body">
+        <div class="form-group"><label>数量 * (≤{{ fmtQty(invStockTarget.current_stock) }})</label><input v-model.number="invStockForm.quantity" type="number" step="0.01" :max="invStockTarget.current_stock" min="0.01" class="form-input"></div>
+        <div class="form-row">
+          <div class="form-group" style="flex:1"><label>日期 *</label><input v-model="invStockForm.voucher_date" type="date" class="form-input"></div>
+          <div class="form-group" style="flex:1"><label>参考</label><input v-model="invStockForm.reference" class="form-input" placeholder="领用单号等"></div>
+        </div>
+        <div class="form-group"><label>备注</label><input v-model="invStockForm.notes" class="form-input"></div>
+        <div class="form-group"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" v-model="invStockForm.is_posted">自动生成出库凭证</label></div>
+        <div v-if="invStockMsg" :style="{padding:'8px 12px',borderRadius:'6px',marginTop:'8px',background: invStockMsg.indexOf('成功')>=0?'#e8f5e9':'#ffebee',color: invStockMsg.indexOf('成功')>=0?'#2e7d32':'#c62828'}">{{ invStockMsg }}</div>
+      </div>
+      <div class="modal-actions">
+        <button @click="invShowStockOut=false" class="btn-cancel">关闭</button>
+        <button @click="doStockOut" class="btn-primary">确认出库</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 交易记录弹窗 -->
+  <div v-if="invShowTxn" class="modal-overlay" @click.self="invShowTxn=false">
+    <div class="modal" style="max-width:700px">
+      <div class="modal-title">📜 流水记录 — {{ invTxnItem.item_name }}</div>
+      <div class="modal-body">
+        <table class="tbl" style="width:100%" v-if="invTxns.length">
+          <thead><tr><th>日期</th><th>类型</th><th>方向</th><th style="text-align:right">数量</th><th style="text-align:right">单价</th><th style="text-align:right">金额</th><th>批次</th><th>凭证</th><th>参考</th></tr></thead>
+          <tbody>
+            <tr v-for="t in invTxns">
+              <td>{{ t.trans_date }}</td>
+              <td><span class="badge badge-info">{{ invTxnTypeLabel(t.trans_type) }}</span></td>
+              <td><span :style="{color:t.direction==='in'?'#2e7d32':'#c62828',fontWeight:600}">{{ t.direction==='in' ? '入库' : '出库' }}</span></td>
+              <td style="text-align:right">{{ fmtQty(t.quantity) }}</td>
+              <td style="text-align:right">¥{{ fmt(t.unit_cost) }}</td>
+              <td style="text-align:right;font-weight:600">¥{{ fmt(t.total_cost) }}</td>
+              <td style="font-size:12px">{{ t.batch_no || '-' }}</td>
+              <td style="font-size:12px">{{ t.voucher_no || '-' }}</td>
+              <td style="font-size:12px">{{ t.reference || '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-else style="text-align:center;padding:30px;color:#999">暂无流水记录</div>
+      </div>
+      <div class="modal-actions"><button @click="invShowTxn=false" class="btn-cancel">关闭</button></div>
+    </div>
+  </div>
+
+  <!-- 收发存汇总表弹窗 -->
+  <div v-if="invShowBalance" class="modal-overlay" @click.self="invShowBalance=false">
+    <div class="modal" style="max-width:900px">
+      <div class="modal-title">📊 存货收发存汇总表
+        <span style="margin-left:12px;font-size:14px;font-weight:400">
+          <select v-model="invBalYear" @change="loadInvBalance()" style="padding:4px 8px;border-radius:4px;border:1px solid #ccc">
+            <option v-for="y in invBalYears" :value="y">{{ y }}年</option>
+          </select>
+          <select v-model="invBalMonth" @change="loadInvBalance()" style="padding:4px 8px;border-radius:4px;border:1px solid #ccc;margin-left:4px">
+            <option v-for="m in 12" :value="m">{{ m }}月</option>
+          </select>
+        </span>
+      </div>
+      <div class="modal-body">
+        <table class="tbl" style="width:100%" v-if="invBalance.length">
+          <thead><tr><th>编码</th><th>名称</th><th>单位</th><th style="text-align:right">期初数量</th><th style="text-align:right">期初金额</th><th style="text-align:right">本期入库</th><th style="text-align:right">入库金额</th><th style="text-align:right">本期出库</th><th style="text-align:right">出库金额</th><th style="text-align:right">期末数量</th><th style="text-align:right">期末金额</th></tr></thead>
+          <tbody>
+            <tr v-for="r in invBalance">
+              <td style="font-family:monospace">{{ r.item_code }}</td>
+              <td>{{ r.item_name }}</td>
+              <td>{{ r.unit }}</td>
+              <td style="text-align:right">{{ fmtQty(r.opening_qty) }}</td>
+              <td style="text-align:right">¥{{ fmt(r.opening_amount) }}</td>
+              <td style="text-align:right">{{ fmtQty(r.in_qty) }}</td>
+              <td style="text-align:right">¥{{ fmt(r.in_amount) }}</td>
+              <td style="text-align:right">{{ fmtQty(r.out_qty) }}</td>
+              <td style="text-align:right">¥{{ fmt(r.out_amount) }}</td>
+              <td style="text-align:right;font-weight:700">{{ fmtQty(r.closing_qty) }}</td>
+              <td style="text-align:right;font-weight:700">¥{{ fmt(r.closing_amount) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-else style="text-align:center;padding:30px;color:#999">暂无数据</div>
+      </div>
+      <div class="modal-actions"><button @click="invShowBalance=false" class="btn-cancel">关闭</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- 添加用户弹窗 -->
+    <div v-if="showAddUser" class="modal-overlay" @click.self="showAddUser=false">
+      <div class="modal" style="max-width:400px">
+        <div class="modal-title">➕ 添加用户</div>
+        <div class="modal-body">
+          <div class="form-group"><label>用户名</label><input v-model="newUser.username" class="form-input"></div>
+          <div class="form-group"><label>密码</label><input v-model="newUser.password" type="password" class="form-input"></div>
+          <div class="form-group"><label>角色</label>
+            <select v-model="newUser.role" class="form-input">
+              <option value="viewer">阅览者</option>
+              <option value="accountant">会计</option>
+              <option value="admin">管理员</option>
+              <option value="super_admin">超级管理员</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button @click="showAddUser=false" class="btn-cancel">取消</button>
+          <button @click="createAdmin" class="btn-primary">创建</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 修改密码弹窗 -->
+    <div v-if="showChangePwd" class="modal-overlay" @click.self="showChangePwd=false">
+      <div class="modal" style="max-width:400px">
+        <div class="modal-title">🔑 修改密码</div>
+        <div class="modal-body">
+          <div class="form-group"><label>旧密码</label><input v-model="pwdOld" type="password" class="form-input"></div>
+          <div class="form-group"><label>新密码</label><input v-model="pwdNew" type="password" class="form-input"></div>
+          <div class="form-group"><label>确认新密码</label><input v-model="pwdConfirm" type="password" class="form-input"></div>
+          <div v-if="pwdError" style="color:#e74c3c;font-size:13px;margin-top:8px">{{pwdError}}</div>
+        </div>
+        <div class="modal-actions">
+          <button @click="showChangePwd=false" class="btn-cancel">取消</button>
+          <button @click="doChangePwd" class="btn-primary">确认修改</button>
+        </div>
+      </div>
+    </div>
+
+<!-- 期末结转弹窗 -->
+<div v-if="showPeriodClose" class="modal-overlay" @click.self="showPeriodClose=false">
+<div class="modal" style="max-width:550px">
+<div class="modal-header"><h3>📅 期末结转</h3><span class="close" @click="showPeriodClose=false">&times;</span></div>
+<div class="modal-body">
+<div style="margin-bottom:15px">
+<label>结转期间</label>
+<select v-model="closePeriod" style="margin-left:8px;padding:6px 12px;border:1px solid #ddd;border-radius:4px">
+<option v-for="p in periodOptions" :value="p.value" :disabled="p.disabled">{{p.label}}</option>
+</select>
+</div>
+<div v-if="closeStatus.revenue_total!==undefined" style="background:#f9f9f9;padding:12px;border-radius:6px;margin-bottom:12px">
+<div style="display:flex;justify-content:space-between;padding:4px 0"><span>📈 收入合计</span><span class="mono" style="color:#27ae60">{{closeStatus.revenue_total.toFixed(2)}}</span></div>
+<div style="display:flex;justify-content:space-between;padding:4px 0"><span>📉 费用合计</span><span class="mono" style="color:#e74c3c">{{closeStatus.expense_total.toFixed(2)}}</span></div>
+<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid #ddd;margin-top:4px;padding-top:8px;font-weight:bold">
+<span>{{closeStatus.net_profit>=0?'📊 净利润':'📊 净亏损'}}</span>
+<span class="mono" :style="closeStatus.net_profit>=0?'color:#27ae60':'color:#e74c3c'">{{closeStatus.net_profit.toFixed(2)}}</span>
+</div>
+</div>
+<div v-if="closeStatus.closed" class="msg-warning" style="background:#fff3cd;padding:10px;border-radius:6px">⚠️ 该期间已结转 ({{closeStatus.closed_at}})</div>
+</div>
+<div class="modal-footer">
+<button class="btn btn-outline btn-sm" @click="showPeriodClose=false">关闭</button>
+<button class="btn btn-danger btn-sm" v-if="closeStatus.closed" @click="reversePeriodClose" style="margin-left:8px">↩ 反结转</button>
+<button class="btn btn-primary btn-sm" v-else @click="doPeriodClose" :disabled="!closeStatus.net_profit">✅ 执行结转</button>
+
+      <!-- ===== 账套编辑弹窗 ===== -->
+      <div v-if="showAsModal" class="modal-overlay" @click.self="showAsModal=false">
+        <div class="modal" style="max-width:500px">
+          <div class="modal-title">{{editingAsId?'✏️ 编辑账套':'➕ 新建账套'}}</div>
+          <div class="modal-body">
+            <div class="form-group"><label>名称 *</label><input type="text" v-model="asForm.name" class="form-input"></div>
+            <div class="form-group"><label>公司</label><input type="text" v-model="asForm.company" class="form-input"></div>
+            <div class="form-group"><label>会计年度 *</label><input type="number" v-model="asForm.year" class="form-input"></div>
+            <div class="form-group"><label>启用日期</label><input type="date" v-model="asForm.start_date" class="form-input"></div>
+            <div class="form-group"><label>截止日期</label><input type="date" v-model="asForm.end_date" class="form-input"></div>
+            <div class="form-group"><label>本位币</label><input type="text" v-model="asForm.currency" class="form-input" style="width:80px"></div>
+          </div>
+          <div class="modal-actions">
+            <button @click="showAsModal=false" class="btn-cancel">取消</button>
+            <button @click="saveAccountSet" class="btn-primary">保存</button>
+          </div>
+        </div>
+      </div>
+
+</div>
+</div>
+</div>
+</div>
+
+<script>
+
+(function(){
+  console.log('[DEBUG] Script block running, Vue version:', typeof Vue !== 'undefined' ? Vue.version : 'NOT LOADED');
+  window.__vueErrors = [];
+  window.addEventListener('error', function(e) {
+    console.error('[DEBUG] Global error:', e.message, e.filename, e.lineno);
+    window.__vueErrors.push({msg:e.message, file:e.filename, line:e.lineno, col:e.colno, time:new Date().toISOString()});
+  });
+  window.addEventListener('unhandledrejection', function(e) {
+    console.error('[DEBUG] Unhandled rejection:', e.reason);
+    window.__vueErrors.push({msg:'Unhandled: '+e.reason, time:new Date().toISOString()});
+  });
+})();
+
+
+const tokenKey = 'jia_acc_token';
+const apiBase = window.API_BASE || window.location.origin;
+const authHeader = () => ({ Authorization: 'Bearer ' + localStorage.getItem(tokenKey) });
+
+const typeLabels = { asset:'资产', liability:'负债', equity:'权益', cost:'成本', revenue:'收入', expense:'费用', cash:'现金', bank:'银行卡', wechat:'微信', alipay:'支付宝', other:'其他' };
+
+// 全局错误处理
+Vue.config.errorHandler = function(err, vm, info) {
+  console.error('[Vue Error]', err.message, info);
+  var b = document.getElementById('__debug_version');
+  if (b) b.textContent = '🔴 ERR: '+err.message;
+};
+window.addEventListener('error', function(e) {
+  console.error('[Global Error]', e.message, e.filename, 'line', e.lineno);
+});
+new Vue({
+  el: '#app',
+  data: {
+    loggedIn: !!localStorage.getItem(tokenKey),
+    userRole: localStorage.getItem('userRole') || 'viewer',
+    loginUser: 'admin', loginPass: '', loginErr: '',
+    faList: [], faDetail: null, faSearch: '', faStatusFilter: '', faPage: 1, faPageSize: 20,
+    showFaCreate: false, editingFaId: null, faForm: {}, fixedAssetSubjects: [], faDepSubjects: [],
+    showFaDepConfirm: false, faDepYear: new Date().getFullYear(), faDepMonth: new Date().getMonth()+1, faDepLoading: false,
+    tab: 'dashboard', loadingT: false, loadingV: false,
+    // 账套
+    accountSets: [], currentAsId: 1,
+    asForm: { id:null, name:'', company:'', year:2026, start_date:'', end_date:'', currency:'CNY' },
+    showAsModal: false, editingAsId: null,
+    // 仪表盘
+    dashboard: { incomeTotal:0, expenseTotal:0, netProfit:0, transactionCount:0, ytdIncome:0, ytdExpense:0, ytdNetProfit:0, byCategory:[], trend:[], maxTrend:0 },
+    // 凭证
+    vouchers: { list:[], total:0, page:1, totalPages:0, pageSize:20 },
+    vFilter: { type:'', status:'', date_from:'', date_to:'' },
+    showVModal: false, voucherView: null,
+    vForm: { voucher_type:'记', voucher_date:new Date().toISOString().slice(0,10), description:'', currency_id:1, attachments:0, entries:[{subject_id:null,debit_amount:0,credit_amount:0,summary:'',aux_type_id:null,aux_item_id:null},{subject_id:null,debit_amount:0,credit_amount:0,summary:'',aux_type_id:null,aux_item_id:null}] },
+    // 流水
+    transactions: { list:[], total:0, page:1, totalPages:0, pageSize:20 },
+    txMeta: null,
+    tFilter: { type:'', subject_id:'', date_from:'', date_to:'', keyword:'' },
+    // 科目 & 账户
+    allSubjects: [], accounts: [],
+    // 辅助核算
+    auxTypes: [], auxItems: [],
+    auxFilter: { type_id:'', keyword:'' },
+    auxLedger: { items:[], details:[], totals:{debit:'0.00',credit:'0.00'}, count:0 },
+    auxLedgerFilter: { type_id:'', item_id:'', subject_id:'', year:'', month:'' },
+    showAuxTypeModal: false, showAuxItemModal: false,
+    auxTypeForm: { id:null, code:'', name:'', description:'', sort_order:0 },
+    auxItemForm: { id:null, type_id:'', code:'', name:'', contact:'', phone:'', address:'', note:'' },
+    // 币种
+    currencies: [], showCurrencyModal: false, currencyForm: { id:null, code:'', name:'', symbol:'', rate:1 },
+    // 账簿
+    ledgerTab: 'general', ledgerDateFrom: '', ledgerDateTo: '', ledgerYear: '', ledgerMonth: '',
+    generalLedger: null, detailSubjectId: null, detailLedger: {}, detailPage: 1,
+    journal: {},
+    // 报表
+    stmtTab: 'trial', reportDate: '', reportYear: '', reportMonth: '',
+    trialBalance: {}, balanceSheet: {}, incomeStatement: {},
+    reportTitle: '', reportPeriod: '',
+    // 账户弹窗
+    showAcctModal: false, acctForm: { id:null, name:'', type:'bank', balance:0, note:'' },
+    // 智能推荐
+    suggestions: {}, // { entryIndex: [sug...] }
+    suggestTimer: null,
+  // 银行对账
+  bankStatements: [], bankFilterAccount: null, showBankImport: false,
+  bankImport: { account_id: 2, statement_date: '', csv_content: '', preview: [], note: '' },
+  selectedStatement: null, stmtItems: [],
+  showReconcileModal: false, reconcileItem: {},
+  matchSearch: { date: '', amount: '' }, matchCandidates: [], matchVoucher: null,
+  statusLabels: { pending: '未对账', partial: '部分对账', reconciled: '已对账' },
+  cashFlow: { period: '', items: [] }, cashFlowPeriod: '', cashFlowPeriods: [],
+  // 期末结转
+  showPeriodClose: false, closePeriod: '', closeStatus: { revenue_total: 0, expense_total: 0, net_profit: 0, closed_at: null, closed: false },
+  periodOptions: [],
+  admins: [],
+  showAddUser: false,
+  showChangePwd: false,
+  newUser: { username: '', password: '', role: 'viewer' },
+  pwdOld: '', pwdNew: '', pwdConfirm: '', pwdError: '',
+    // AR/AP
+    arapSummary: { ar:{balance:0,total:0,paid:0,reconciled:0}, ap:{balance:0,total:0,paid:0,reconciled:0}, net_position:0, customer_count:0, supplier_count:0 },
+    arapAging: { type:'ar', as_of:'', buckets:null, summary:{total_outstanding:0,grand_total:0} },
+    arapType: 'ar',
+    // 税务
+    taxYear: new Date().getFullYear(), taxMonth: new Date().getMonth()+1, taxLoading: false,
+    taxSummary: null, taxCit: null, taxSurtax: null,
+    vatBreakdown: [], surtaxItems: [], taxSettings: [], trendData: [],
+    taxLoadErr: '', taxGeneratedAt: '',
+// ---- 库存数据 ----
+invItems: [], invSearch: '', invCategoryFilter: '', invShowForm: false, editingInvId: null,
+invForm: { item_name:'', category:'raw_material', spec:'', unit:'个', unit_price:0, safety_stock:0, subject_id:'', notes:'' },
+invSubjects: [], invSummary: { itemCount:0, totalValue:0, alertCount:0, zeroStockCount:0 },
+invShowStockIn: false, invShowStockOut: false, invStockTarget: {},
+invStockForm: { quantity:0, unit_cost:0, voucher_date:new Date().toISOString().slice(0,10), batch_no:'', reference:'', notes:'', is_posted:false },
+invStockMsg: '',
+invShowTxn: false, invTxnItem: {}, invTxns: [],
+invShowBalance: false, invBalance: [], invBalYear: new Date().getFullYear(), invBalMonth: new Date().getMonth()+1,
+invBalYears: (function(){var y=new Date().getFullYear();var a=[];for(var i=y-2;i<=y;i++)a.push(i);return a;})(),
+
+
+
+  },
+  mounted() { console.log("[DEBUG] Vue mounted OK, app:", this._isMounted); this.loadAccountSets(); },
+  computed: {
+    roleLabel() {
+      const labels = { super_admin:"超级管理员", admin:"管理员", accountant:"会计", viewer:"阅览者" };
+      return labels[this.userRole] || this.userRole;
+    },
+    totalDebit() { return this.vForm.entries.reduce((a,e)=>a+(Number(e.debit_amount)||0),0) },
+    totalCredit() { return this.vForm.entries.reduce((a,e)=>a+(Number(e.credit_amount)||0),0) },
+taxYearOptions() { const y=new Date().getFullYear(); let o=[]; for(let i=y-3;i<=y+1;i++)o.push(i); return o; },
+    
+    faFilteredList() {
+      var list = this.faList;
+      if (this.faSearch) {
+        var q = this.faSearch.toLowerCase();
+        list = list.filter(function(x) { return (x.asset_code||'').toLowerCase().indexOf(q)>=0 || (x.asset_name||'').toLowerCase().indexOf(q)>=0; });
+      }
+      if (this.faStatusFilter) { list = list.filter(function(x) { return x.status === this.faStatusFilter; }.bind(this)); }
+      var start = (this.faPage-1) * this.faPageSize;
+      return list.slice(start, start + this.faPageSize);
+    },
+    faTotalOriginal() { return this.faList.reduce(function(s,x){return s+Number(x.original_value||0)},0); },
+    faTotalAccumulated() { return this.faList.reduce(function(s,x){return s+Number(x.accumulated_depreciation||0)},0); },
+    faTotalNet() { return this.faList.reduce(function(s,x){return s+Number(x.net_value||0)},0); },
+    faTotalMonthly() { return this.faList.reduce(function(s,x){return s+Number(x.monthly_depreciation||0)},0); },
+    taxSurtaxTotal() {
+      if (!this.taxSurtax) return 0;
+      return (this.taxSurtax.urban?.amount || 0) + (this.taxSurtax.edu?.amount || 0) + (this.taxSurtax.local?.amount || 0);
+    },
+    taxGrandTotal() {
+      return (this.taxSummary?.vat?.payable || 0) + this.taxSurtaxTotal;
+    },
+    taxCitQuarter() {
+      return Math.ceil(this.taxMonth / 3);
+    },
+    taxMaxTrend() {
+      if (!this.trendData.length) return 0;
+      return Math.max(...this.trendData.map(d => d.total), 1);
+    },
+
+        yearOptions() { const y=new Date().getFullYear(); let o=[]; for(let i=y-2;i<=y;i++)o.push(i); return o; }
+  },
+  created() {
+    console.log('[DEBUG] Vue created hook, loggedIn:', this.loggedIn);
+    if (this.loggedIn) { this.refreshUserRole(); this.loadDashboard(); this.loadSubjects(); this.loadAccounts(); this.loadCurrencies(); this.loadAuxTypes(); this.loadAuxItems(); }
+  },
+  methods: {
+    // 刷新当前用户角色（修复 localStorage 角色过期问题）
+    async refreshUserRole() {
+      try {
+        const r = await axios.get(apiBase+'/api/auth/me',{headers:authHeader()});
+        if(r.data.code===0){
+          var role=r.data.data.role;
+          localStorage.setItem('userRole',role);
+          this.userRole=role;
+          console.log('[DEBUG] Role refreshed:',role);
+        }
+      } catch(e) { console.log('[DEBUG] Role refresh failed:',e.message); }
+    },
+    fmt(v) { return (Number(v)||0).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2}) },
+    barHeight(v,max) { return max>0?((v/max)*100).toFixed(1)+'%':'0%' },
+    typeLabel(t) { return typeLabels[t]||t },
+    statusLabel(s) { return {draft:'草稿',audited:'已审核',posted:'已过账'}[s]||s },
+    // 日记账日合计辅助
+    _lastDisplayedDate: '',
+    showDailyTotal(r, idx) {
+      const dd = r.date?.slice(0,10);
+      if (idx === 0) { this._lastDisplayedDate = dd; return false; }
+      if (dd !== this._lastDisplayedDate) { this._lastDisplayedDate = dd; return true; }
+      return false;
+    },
+    getDailyTotal(dd) {
+      if (!this.journal.dailyTotals) return {debit:0,credit:0,balance:0};
+      const d = this.journal.dailyTotals.find(t => t.date === dd);
+      return d || {debit:0,credit:0,balance:0};
+    },
+    // === 登录 ===
+    async doLogin() {
+      if (!this.loginUser || !this.loginPass) { this.loginErr = '请输入用户名和密码'; return }
+      try {
+        const r = await axios.post(apiBase+'/api/auth/login',{username:this.loginUser,password:this.loginPass});
+        if(r.data.code===0){var t=r.data.data;localStorage.setItem(tokenKey,t.token);localStorage.setItem('userRole',t.user.role);localStorage.setItem('userId',t.user.id);this.userRole=t.user.role;this.loggedIn=true;this.loginErr='';this.loadDashboard();this.loadSubjects();this.loadAccounts()}
+        else this.loginErr=r.data.message
+      } catch(e) { this.loginErr='登录失败: '+(e.response?.data?.message||e.message) }
+    },
+    doLogout() { localStorage.removeItem(tokenKey); localStorage.removeItem('userRole'); localStorage.removeItem('userId'); this.loggedIn=false; this.userRole='viewer'; },
+    // === RBAC: 用户管理 ===
+    async loadAdmins() {
+      try { var r = await axios.get('api/accounting/admins'); if(r.data.code===0) this.admins = r.data.data; }
+      catch(e) { console.error('loadAdmins:', e) }
+    },
+    async createAdmin() {
+      if(!this.newUser.username||!this.newUser.password) return alert('用户名和密码不能为空');
+      try { var r = await axios.post('api/accounting/admins', this.newUser); if(r.data.code===0) { alert('创建成功'); this.showAddUser=false; this.newUser={username:'',password:'',role:'viewer'}; this.loadAdmins(); } else alert(r.data.message); }
+      catch(e) { alert(e.response?.data?.message||e.message) }
+    },
+    async updateAdminRole(u) {
+      if(!confirm('确定修改 '+u.username+' 的角色为 '+u.role+'？')) { this.loadAdmins(); return }
+      try { var r = await axios.put('api/accounting/admins/'+u.id, {role:u.role}); if(r.data.code===0) this.loadAdmins(); else alert(r.data.message) }
+      catch(e) { alert(e.response?.data?.message||e.message) }
+    },
+    async deleteAdmin(u) {
+      if(!confirm('确定删除用户 '+u.username+'？此操作不可撤销！')) return
+      try { var r = await axios.delete('api/accounting/admins/'+u.id); if(r.data.code===0) { this.loadAdmins(); } else alert(r.data.message) }
+      catch(e) { alert(e.response?.data?.message||e.message) }
+    },
+    async doChangePwd() {
+      this.pwdError='';
+      if(!this.pwdOld||!this.pwdNew) { this.pwdError='请填写新旧密码'; return }
+      if(this.pwdNew!==this.pwdConfirm) { this.pwdError='两次新密码不一致'; return }
+      if(this.pwdNew.length<6) { this.pwdError='密码至少6位'; return }
+      try { var r=await axios.put('api/accounting/me/password',{oldPassword:this.pwdOld,newPassword:this.pwdNew}); if(r.data.code===0) { alert('密码修改成功'); this.showChangePwd=false; this.pwdOld='';this.pwdNew='';this.pwdConfirm=''; } else { this.pwdError=r.data.message } }
+      catch(e) { this.pwdError=e.response?.data?.message||e.message }
+    },
+    fmtTime(t) { if(!t) return ''; var d=new Date(t+'Z'); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); },
+    // === 税务看板 ===
+    async loadTaxDashboard() {
+      this.taxLoadErr = '';
+      this.taxLoading = true;
+      var self = this;
+      var safetyTimer = setTimeout(function() {
+        if (self.taxLoading) { self.taxLoading = false; self.taxLoadErr = '请求超时，请检查网络后重试'; }
+      }, 15000);
+      try {
+        var taxUrl = apiBase + '/api/tax';
+        var q = Math.ceil(this.taxMonth / 3);
+        var summaryRes = null, citRes = null, surtaxRes = null, settingsRes = null;
+        try {
+          var r1 = await axios.get(taxUrl + '/summary?year=' + this.taxYear + '&month=' + this.taxMonth, {headers:authHeader()});
+          if (r1.data.code === 0) {
+            this.taxSummary = r1.data.data;
+            this.taxGeneratedAt = this.taxSummary.generated_at
+              ? new Date(this.taxSummary.generated_at).toLocaleString('zh-CN')
+              : new Date().toLocaleString('zh-CN');
+          }
+        } catch(e) { /* continue */ }
+        try {
+          var r2 = await axios.get(taxUrl + '/cit?year=' + this.taxYear + '&quarter=' + q, {headers:authHeader()});
+          if (r2.data.code === 0) this.taxCit = r2.data.data;
+        } catch(e) {}
+
+        try {
+          var r3 = await axios.get(taxUrl + '/surtax?year=' + this.taxYear + '&month=' + this.taxMonth, {headers:authHeader()});
+          if (r3.data.code === 0) {
+            var s = r3.data.data;
+            var items = [];
+            if (s.surtax && s.surtax.urban_maintenance) items.push({ name: '城市维护建设税', base: s.vat_payable || 0, rate: s.surtax.urban_maintenance.rate, amount: s.surtax.urban_maintenance.amount });
+            if (s.surtax && s.surtax.education_surcharge) items.push({ name: '教育费附加', base: s.vat_payable || 0, rate: s.surtax.education_surcharge.rate, amount: s.surtax.education_surcharge.amount });
+            if (s.surtax && s.surtax.local_education) items.push({ name: '地方教育附加', base: s.vat_payable || 0, rate: s.surtax.local_education.rate, amount: s.surtax.local_education.amount });
+            if (s.stamp_duty) items.push({ name: '印花税（购销合同）', base: s.stamp_duty.base, rate: s.stamp_duty.rate, amount: s.stamp_duty.amount });
+            this.taxSurtax = { urban: items[0], edu: items[1], local: items[2], stamp: items[3] };
+            this.surtaxItems = items;
+          }
+        } catch(e) {}
+        try {
+          var r4 = await axios.get(taxUrl + '/settings', {headers:authHeader()});
+          if (r4.data.code === 0) this.taxSettings = r4.data.data;
+        } catch(e) {}
+
+        // 增值税明细
+        try {
+          var vatRes = await axios.get(taxUrl + '/vat?year=' + this.taxYear + '&month=' + this.taxMonth, {headers:authHeader()});
+          if (vatRes.data.code === 0) {
+            var v = vatRes.data.data;
+            this.vatBreakdown = [];
+            if (v.output_detail) this.vatBreakdown = v.output_detail.map(function(d) { return { code: d.code, name: d.name, amount: d.amount, rate: d.rate, tax: d.tax }; });
+            if (v.input_detail) v.input_detail.forEach(function(d) { this.vatBreakdown.push({ code: d.code, name: d.name + '(进项)', amount: d.amount, rate: d.rate, tax: d.tax }); }.bind(this));
+            this.taxSummary = Object.assign({}, this.taxSummary, { vat: { output: v.output_vat || 0, input: v.input_vat || 0, payable: v.vat_payable || 0 } });
+          }
+        } catch(e) { /* 增值税详情非必需 */ }
+
+        // 趋势（异步）
+        this.loadTaxTrend().then(function(d) { self.trendData = d; });
+      } catch (e) {
+        this.taxLoadErr = '加载失败: ' + (e.response && e.response.data && e.response.data.message || e.message);
+      } finally {
+        clearTimeout(safetyTimer);
+        this.taxLoading = false;
+      }
+    },
+    async loadTaxTrend() {
+      var self = this;
+      var data = [];
+      var now = new Date(this.taxYear, this.taxMonth - 1, 1);
+      for (var i = 11; i >= 0; i--) {
+        var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        var y = d.getFullYear(), m = d.getMonth() + 1;
+        try {
+          var r = await axios.get(apiBase + '/api/tax/summary?year=' + y + '&month=' + m, {headers:authHeader()});
+          if (r.data.code === 0) {
+            var total = r.data.data.total_payable || 0;
+            data.push({ label: y + '-' + String(m).padStart(2, '0'), vat: 0, total: total });
+          }
+        } catch(e) { /* 跳过 */ }
+      }
+      return data;
+    },
+    async exportTaxCSV() {
+      try {
+        var r = await axios.get(apiBase + '/api/tax/export?year=' + this.taxYear + '&month=' + this.taxMonth + '&format=csv', { headers: authHeader(), responseType: 'blob' });
+        var url = URL.createObjectURL(r.data);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'tax_' + this.taxYear + String(this.taxMonth).padStart(2, '0') + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch(e) { alert('导出失败: ' + (e.response && e.response.data && e.response.data.message || e.message)); }
+    },
+    async saveTaxSettings() {
+      try {
+        for (var i = 0; i < this.taxSettings.length; i++) {
+          var s = this.taxSettings[i];
+          await axios.put(apiBase + '/api/tax/settings/' + s.id, { rate: s.rate }, {headers: authHeader()});
+        }
+        alert('税率已保存，重新计算中…');
+        await this.loadTaxDashboard();
+      } catch(e) { alert('保存失败: ' + (e.response && e.response.data && e.response.data.message || e.message)); }
+    },
+
+    faList: [], faDetail: null, faSearch: '', faStatusFilter: '', faPage: 1, faPageSize: 20,
+showFaCreate: false, editingFaId: null, faForm: {}, fixedAssetSubjects: [], faDepSubjects: [],
+showFaDepConfirm: false, faDepYear: new Date().getFullYear(), faDepMonth: new Date().getMonth()+1, faDepLoading: false,
+
+// ---- 固定资产 computed ----
+faFilteredList() {
+  var list = this.faList;
+  if (this.faSearch) {
+    var q = this.faSearch.toLowerCase();
+    list = list.filter(function(x) { return (x.asset_code||'').toLowerCase().indexOf(q)>=0 || (x.asset_name||'').toLowerCase().indexOf(q)>=0; });
+  }
+  if (this.faStatusFilter) { list = list.filter(function(x) { return x.status === this.faStatusFilter; }.bind(this)); }
+  var start = (this.faPage-1) * this.faPageSize;
+  return list.slice(start, start + this.faPageSize);
+},
+faTotalOriginal() { return this.faList.reduce(function(s,x){return s+Number(x.original_value||0)},0); },
+faTotalAccumulated() { return this.faList.reduce(function(s,x){return s+Number(x.accumulated_depreciation||0)},0); },
+faTotalNet() { return this.faList.reduce(function(s,x){return s+Number(x.net_value||0)},0); },
+faTotalMonthly() { return this.faList.reduce(function(s,x){return s+Number(x.monthly_depreciation||0)},0); },
+
+// ---- 固定资产方法 ----
+faCategoryLabel(c) {
+  var m = { electronic:'💻 电子设备', office:'🪑 办公设备', building:'🏗️ 建筑物', vehicle:'🚗 车辆', other:'📦 其他' };
+  return m[c] || c;
+},
+faStatusLabel(s) {
+  var m = { in_use:'使用中', idle:'闲置', disposed:'已处置', scrapped:'已报废' };
+  return m[s] || s;
+},
+adjustFaPage() { this.faPage = 1; },
+async loadFixedAssets() {
+  var self = this;
+  try {
+    var params = { page: 1, pageSize: 200 };
+    if (this.faSearch) params.search = this.faSearch;
+    if (this.faStatusFilter) params.status = this.faStatusFilter;
+    var r = await axios.get(apiBase + '/api/accounting/fixed-assets', { headers: authHeader(), params: params });
+    if (r.data.code === 0) { this.faList = r.data.data.list || []; }
+    // 加载资产类科目
+    var sr = await axios.get(apiBase + '/api/accounting/subjects/tree', { headers: authHeader() });
+    if (sr.data.code === 0) {
+      var subjects = [];
+      var depSubjects = [];
+      function walk(nodes) {
+        if (!nodes) return;
+        nodes.forEach(function(s) {
+          if ((s.code||'').startsWith('16')) {
+            if ((s.code||'')==='1602') { depSubjects.push(s); }
+            else if (s.code!=='1601'&&s.code!=='1602') subjects.push(s);
+            else if (s.children && s.children.length) subjects.push(s);
+          }
+          if (s.children) walk(s.children);
+        });
+      }
+      walk(sr.data.data);
+      this.fixedAssetSubjects = subjects.length ? subjects : sr.data.data.filter(function(s){return (s.code||'').startsWith('16')&&s.code!=='1602';});
+      this.faDepSubjects = depSubjects.length ? depSubjects : sr.data.data.filter(function(s){return s.code==='1602'||s.name.indexOf('折旧')>=0;});
+    }
+  } catch(e) { console.error('loadFixedAssets error:', e); }
+},
+clearFaForm() {
+  this.editingFaId = null;
+  this.faForm = { asset_name:'', category:'electronic', subject_id:'', dep_subject_id:null,
+    purchase_date: new Date().toISOString().slice(0,10), original_value:0, residual_rate:0.05,
+    useful_life:36, monthly_depreciation:0, location:'', department:'', responsible_person:'', notes:'', status:'in_use' };
+},
+editFa(fa) {
+  this.faForm = {
+    asset_name: fa.asset_name, category: fa.category, subject_id: fa.subject_id,
+    dep_subject_id: fa.dep_subject_id, purchase_date: fa.purchase_date.slice(0,10),
+    original_value: Number(fa.original_value), residual_rate: Number(fa.residual_rate),
+    useful_life: Number(fa.useful_life), location: fa.location||'', department: fa.department||'',
+    responsible_person: fa.responsible_person||'', notes: fa.notes||'', status: fa.status,
+    accumulated_depreciation: Number(fa.accumulated_depreciation||0)
+  };
+  this.editingFaId = fa.id;
+  this.showFaCreate = true;
+},
+calcFaDep() {
+  var ov = Number(this.faForm.original_value) || 0;
+  var r = Number(this.faForm.residual_rate) || 0.05;
+  var ul = Number(this.faForm.useful_life) || 1;
+},
+async saveFa() {
+  if (!this.faForm.asset_name || !this.faForm.subject_id || !this.faForm.purchase_date || !this.faForm.original_value || !this.faForm.useful_life) {
+    alert('请填写必填字段: 名称/科目/日期/原值/年限'); return;
+  }
+  var payload = {
+    asset_name: this.faForm.asset_name, category: this.faForm.category,
+    subject_id: this.faForm.subject_id, dep_subject_id: this.faForm.dep_subject_id,
+    purchase_date: this.faForm.purchase_date, original_value: Number(this.faForm.original_value),
+    residual_rate: Number(this.faForm.residual_rate), useful_life: Number(this.faForm.useful_life),
+    location: this.faForm.location, department: this.faForm.department,
+    responsible_person: this.faForm.responsible_person, notes: this.faForm.notes, status: this.faForm.status
+  };
+  try {
+    var r;
+    if (this.editingFaId) {
+      r = await axios.put(apiBase + '/api/accounting/fixed-assets/' + this.editingFaId, payload, {headers: authHeader()});
+    } else {
+      r = await axios.post(apiBase + '/api/accounting/fixed-assets', payload, {headers: authHeader()});
+    }
+    if (r.data.code === 0) {
+      this.showFaCreate = false;
+      await this.loadFixedAssets();
+      alert(r.data.message || '保存成功');
+    } else {
+      alert(r.data.message);
+    }
+  } catch(e) { alert('保存失败: ' + (e.response && e.response.data && e.response.data.message || e.message)); }
+},
+async deleteFa(id) {
+  if (!confirm('确认删除该资产？')) return;
+  try {
+    var r = await axios.delete(apiBase + '/api/accounting/fixed-assets/' + id, {headers: authHeader()});
+    if (r.data.code === 0) { await this.loadFixedAssets(); }
+    else { alert(r.data.message); }
+  } catch(e) { alert('删除失败: ' + (e.response && e.response.data && e.response.data.message || e.message)); }
+},
+async viewFaDep(id) {
+  try {
+    var r = await axios.get(apiBase + '/api/accounting/fixed-assets/' + id, {headers: authHeader()});
+    if (r.data.code === 0) { this.faDetail = { asset_name: r.data.data.asset.asset_name, asset_code: r.data.data.asset.asset_code, depreciation_records: r.data.data.depreciation_records || [] }; }
+  } catch(e) { console.error(e); }
+},
+runDepreciation() {
+  this.showFaDepConfirm = true;
+  this.faDepYear = new Date().getFullYear();
+  this.faDepMonth = new Date().getMonth() + 1;
+},
+async doDepreciation() {
+  this.faDepLoading = true;
+  try {
+    var r = await axios.post(apiBase + '/api/accounting/fixed-assets/depreciation',
+      { year: this.faDepYear, month: this.faDepMonth }, {headers: authHeader()});
+    if (r.data.code === 0) {
+      alert('计提成功！' + (r.data.message||''));
+      this.showFaDepConfirm = false;
+      await this.loadFixedAssets();
+    } else { alert(r.data.message); }
+  } catch(e) { alert('计提失败: ' + (e.response && e.response.data && e.response.data.message || e.message)); }
+  finally { this.faDepLoading = false; }
+},
+
+    async loadAuxTypes() { try{const r=await axios.get(apiBase+'/api/accounting/auxiliary/types',{headers:authHeader()});if(r.data.code===0)this.auxTypes=r.data.data}catch(e){} },
+    async loadAuxItems() { try{const p={};if(this.auxFilter.type_id)p.type_id=this.auxFilter.type_id;if(this.auxFilter.keyword)p.keyword=this.auxFilter.keyword;const r=await axios.get(apiBase+'/api/accounting/auxiliary/items',{params:p,headers:authHeader()});if(r.data.code===0)this.auxItems=r.data.data}catch(e){} },
+    async loadAuxLedger() { try{const p={};if(this.auxLedgerFilter.type_id)p.type_id=this.auxLedgerFilter.type_id;if(this.auxLedgerFilter.item_id)p.item_id=this.auxLedgerFilter.item_id;if(this.auxLedgerFilter.subject_id)p.subject_id=this.auxLedgerFilter.subject_id;if(this.auxLedgerFilter.year)p.year=this.auxLedgerFilter.year;if(this.auxLedgerFilter.month)p.month=this.auxLedgerFilter.month;const r=await axios.get(apiBase+'/api/accounting/auxiliary/ledger',{params:p,headers:authHeader()});if(r.data.code===0)this.auxLedger=r.data.data}catch(e){} },
+    openAuxTypeModal(t){if(t)this.auxTypeForm={id:t.id,code:t.code,name:t.name,description:t.description,sort_order:t.sort_order};else this.auxTypeForm={id:null,code:'',name:'',description:'',sort_order:0};this.showAuxTypeModal=true},
+    async saveAuxType(){try{if(this.auxTypeForm.id)await axios.put(apiBase+'/api/accounting/auxiliary/types/'+this.auxTypeForm.id,this.auxTypeForm,{headers:authHeader()});else await axios.post(apiBase+'/api/accounting/auxiliary/types',this.auxTypeForm,{headers:authHeader()});this.showAuxTypeModal=false;this.loadAuxTypes()}catch(e){alert('保存失败: '+e.message)}},
+    async deleteAuxType(id){if(!confirm('确认删除该辅助核算类型？'))return;try{await axios.delete(apiBase+'/api/accounting/auxiliary/types/'+id,{headers:authHeader()});this.loadAuxTypes()}catch(e){alert('删除失败: '+(e.response?.data?.message||e.message))}},
+    openAuxItemModal(i){if(i)this.auxItemForm={id:i.id,type_id:i.type_id,code:i.code,name:i.name,contact:i.contact||'',phone:i.phone||'',address:i.address||'',note:i.note||''};else this.auxItemForm={id:null,type_id:this.auxFilter.type_id||'',code:'',name:'',contact:'',phone:'',address:'',note:''};this.showAuxItemModal=true},
+    async saveAuxItem(){try{const d={...this.auxItemForm};d.type_id=Number(d.type_id);if(this.auxItemForm.id)await axios.put(apiBase+'/api/accounting/auxiliary/items/'+this.auxItemForm.id,d,{headers:authHeader()});else await axios.post(apiBase+'/api/accounting/auxiliary/items',d,{headers:authHeader()});this.showAuxItemModal=false;this.loadAuxItems()}catch(e){alert('保存失败: '+e.message)}},
+    async deleteAuxItem(id){if(!confirm('确认删除该辅助核算项目？'))return;try{await axios.delete(apiBase+'/api/accounting/auxiliary/items/'+id,{headers:authHeader()});this.loadAuxItems()}catch(e){alert('删除失败: '+(e.response?.data?.message||e.message))}},
+    getAuxItemsByType(typeId){return this.auxItems.filter(a=>a.type_id==typeId)},
+    // === 仪表盘 ===
+    async loadDashboard() {
+      try {
+        const now = new Date();
+        const r = await axios.get(apiBase+'/api/accounting/summary',{params:{year:now.getFullYear(),month:now.getMonth()+1},headers:authHeader()});
+        if(r.data.code!==0) return;
+        const d = r.data.data;
+        const trendArr = (d.trend || []).map(t => ({ month: t.month, income: Number(t.income) || 0, expense: Number(t.expense) || 0 }));
+        const maxTrend=Math.max(1,...trendArr.map(t=>Math.max(t.income,t.expense)));
+        const counts=d.byCategory.reduce((s,c)=>s+c.count,0);
+        this.dashboard={...d,transactionCount:counts,trend:trendArr,maxTrend};
+      } catch(e) { console.error(e) }
+    },
+    // === 凭证 ===
+    async loadVouchers() {
+      this.loadingV = true;
+      try {
+        const p = { page:this.vouchers.page, pageSize:this.vouchers.pageSize, ...this.vFilter };
+        Object.keys(p).forEach(k=>{if(!p[k])delete p[k]});
+        const r = await axios.get(apiBase+'/api/accounting/vouchers',{params:p,headers:authHeader()});
+        if(r.data.code===0) this.vouchers = r.data.data;
+      } catch(e) { console.error(e) }
+      this.loadingV = false;
+    },
+    openVoucherModal() {
+      this.voucherView = null;
+      this.vForm = { voucher_type:'记', voucher_date:new Date().toISOString().slice(0,10), description:'', attachments:0,
+        entries:[{subject_id:null,debit_amount:0,credit_amount:0,summary:'',aux_type_id:null,aux_item_id:null},{subject_id:null,debit_amount:0,credit_amount:0,summary:'',aux_type_id:null,aux_item_id:null}] };
+      this.showVModal = true;
+    },
+    async viewVoucher(v) {
+      try {
+        const r = await axios.get(apiBase+'/api/accounting/vouchers/'+v.id,{headers:authHeader()});
+        if(r.data.code===0) { this.voucherView = r.data.data; this.showVModal = true; }
+      } catch(e) { alert('查询失败') }
+    },
+    addEntry() { this.vForm.entries.push({subject_id:null,debit_amount:0,credit_amount:0,summary:'',aux_type_id:null,aux_item_id:null}) },
+    onEntryChange() {},
+    // === 智能推荐 ===
+    suggestSubjects(idx) {
+      const s = this.vForm.entries[idx]?.summary?.trim() || '';
+      if (s.length < 2) { this.$set(this.suggestions, idx, []); return; }
+      if (this.suggestTimer) clearTimeout(this.suggestTimer);
+      this.suggestTimer = setTimeout(async () => {
+        try {
+          const r = await axios.post(apiBase+'/api/accounting/suggest-subjects', { summary: s, topN: 5 }, { headers: authHeader() });
+          if (r.data.code === 0) this.$set(this.suggestions, idx, r.data.data.suggestions);
+          else this.$set(this.suggestions, idx, []);
+        } catch (e) { this.$set(this.suggestions, idx, []); }
+      }, 300);
+    },
+    applySuggestion(idx, sug) {
+      const e = this.vForm.entries[idx];
+      e.subject_id = sug.subject_id;
+      if (sug.matched_summary) e.summary = sug.matched_summary;
+      this.$set(this.suggestions, idx, []);
+      this.$forceUpdate();
+    },
+    blurSuggestion(idx) {
+      setTimeout(() => { if (this.suggestions[idx]) this.$set(this.suggestions, idx, []); }, 200);
+    },
+    async saveVoucher() {
+      if(Math.abs(this.totalDebit-this.totalCredit)>0.01) return alert('借贷不平衡，请检查金额');
+      try {
+        const body = { ...this.vForm };
+        body.entries = body.entries.map(e=>{
+          const entry = {subject_id:e.subject_id,summary:e.summary||'',debit_amount:Number(e.debit_amount)||0,credit_amount:Number(e.credit_amount)||0};
+          if(e.aux_type_id&&e.aux_item_id) entry.auxiliary=[{type_id:e.aux_type_id,item_id:e.aux_item_id}];
+          return entry;
+        });
+        const r = await axios.post(apiBase+'/api/accounting/vouchers',body,{headers:authHeader()});
+        if(r.data.code===0) { alert('凭证 '+r.data.data.voucher_no+' 创建成功'); this.showVModal=false; this.loadVouchers(); }
+        else alert(r.data.message);
+      } catch(e) { alert('保存失败: '+(e.response?.data?.message||e.message)) }
+    },
+    async auditVoucher(id) {
+      if(!confirm('确认审核通过？审核后不可修改。')) return;
+      try {
+        const r = await axios.post(apiBase+'/api/accounting/vouchers/'+id+'/audit',{}, {headers:authHeader()});
+        if(r.data.code===0) this.loadVouchers();
+        else alert(r.data.message);
+      } catch(e) { alert('审核失败: '+(e.response?.data?.message||e.message)) }
+    },
+    async postVoucher(id) {
+      if(!confirm('确认过账？将生成交易记录并正式入账。')) return;
+      try {
+        const r = await axios.post(apiBase+'/api/accounting/vouchers/'+id+'/post',{}, {headers:authHeader()});
+        if(r.data.code===0) { this.loadVouchers(); this.loadDashboard(); }
+        else alert(r.data.message);
+      } catch(e) { alert('过账失败: '+(e.response?.data?.message||e.message)) }
+    },
+    async unpostVoucher(id) {
+      if(!confirm('确认反过账？将冲销相关交易记录。')) return;
+      try {
+        const r = await axios.post(apiBase+'/api/accounting/vouchers/'+id+'/unpost',{}, {headers:authHeader()});
+        if(r.data.code===0) { this.loadVouchers(); this.loadDashboard(); }
+        else alert(r.data.message);
+      } catch(e) { alert('失败: '+(e.response?.data?.message||e.message)) }
+    },
+    // 红字冲销
+    async reverseVoucher(v) {
+      if(!confirm('确认红字冲销凭证 '+v.voucher_no+' ？\n\n将自动创建冲销凭证、审核并过账。')) return;
+      try {
+        const r = await axios.post(apiBase+'/api/accounting/vouchers/'+v.id+'/reverse',{}, {headers:authHeader()});
+        if(r.data.code===0) { alert('红字冲销成功: ' + r.data.data.voucher_no); this.loadVouchers(); this.loadDashboard(); }
+        else alert(r.data.message);
+      } catch(e) { alert('红冲失败: '+(e.response?.data?.message||e.message)) }
+    },
+    async deleteVoucher(id) {
+      if(!confirm('确认删除？')) return;
+      try {
+        await axios.delete(apiBase+'/api/accounting/vouchers/'+id,{headers:authHeader()});
+        this.loadVouchers();
+      } catch(e) { alert('删除失败') }
+    },
+    printVoucherPreview() {
+      this.reportTitle = '记 账 凭 证';
+      this.reportPeriod = '日期: '+this.vForm.voucher_date+(this.vForm.description?'  摘要: '+this.vForm.description:'');
+      setTimeout(()=>{window.print();this.reportTitle='';this.reportPeriod=''},200);
+    },
+    // === 流水 ===
+    async loadTransactions() {
+      this.loadingT = true;
+      try {
+        const p = { page:this.transactions.page, pageSize:this.transactions.pageSize, ...this.tFilter };
+        Object.keys(p).forEach(k=>{if(!p[k])delete p[k]});
+        const r = await axios.get(apiBase+'/api/accounting/transactions',{params:p,headers:authHeader()});
+        if(r.data.code===0) {
+          this.transactions = r.data.data;
+          this.txMeta = r.data.data._meta || null;
+        }
+      } catch(e) { console.error(e) }
+      this.loadingT = false;
+    },
+    async exportCSV() {
+      try {
+        const r = await axios.get(apiBase+'/api/accounting/export',{params:{date_from:this.tFilter.date_from,date_to:this.tFilter.date_to},headers:authHeader()});
+        const blob = new Blob(['\uFEFF'+r.data],{type:'text/csv;charset=utf-8'});
+        const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='jiaapp_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(url);
+      } catch(e) { alert('导出失败') }
+    },
+    // === 账簿 ===
+    async loadGeneralLedger() {
+      try {
+        const p = {};
+        if(this.ledgerYear) p.year = this.ledgerYear;
+        if(this.ledgerMonth) p.month = this.ledgerMonth;
+        const r = await axios.get(apiBase+'/api/accounting/ledger/general',{params:p,headers:authHeader()});
+        if(r.data.code===0) this.generalLedger = r.data.data;
+      } catch(e) { console.error(e) }
+    },
+    async loadDetailLedger() {
+      if(!this.detailSubjectId) return;
+      try {
+        const p = {page:this.detailPage,pageSize:50};
+        if(this.ledgerDateFrom)p.date_from=this.ledgerDateFrom;if(this.ledgerDateTo)p.date_to=this.ledgerDateTo;
+        const r = await axios.get(apiBase+'/api/accounting/ledger/detail/'+this.detailSubjectId,{params:p,headers:authHeader()});
+        if(r.data.code===0) { this.detailLedger = r.data.data; this.detailLedger.totalPages = Math.ceil(r.data.data.total/50) }
+      } catch(e) { console.error(e) }
+    },
+    async loadJournal(type) {
+      try {
+        const p = {};if(this.ledgerDateFrom)p.date_from=this.ledgerDateFrom;if(this.ledgerDateTo)p.date_to=this.ledgerDateTo;
+        const r = await axios.get(apiBase+'/api/accounting/ledger/journal/'+type,{params:p,headers:authHeader()});
+        if(r.data.code===0) this.journal = r.data.data;
+      } catch(e) { console.error(e) }
+    },
+    refreshLedger() {
+      this._lastDisplayedDate = '';
+      if(this.ledgerTab==='general') this.loadGeneralLedger();
+      else if(this.ledgerTab==='detail') { this.detailPage=1; this.loadDetailLedger(); }
+      else if(this.ledgerTab==='cash'||this.ledgerTab==='bank') this.loadJournal(this.ledgerTab);
+    },
+    printLedger() {
+      const titles = {general:'总分类账',detail:'明细分类账',cash:'现金日记账',bank:'银行日记账'};
+      this.reportTitle = titles[this.ledgerTab]||'';
+      this.reportPeriod = this.ledgerDateFrom||this.ledgerDateTo?('期间:'+(this.ledgerDateFrom||'...')+' ~ '+(this.ledgerDateTo||'...')):'';
+      setTimeout(()=>{window.print();this.reportTitle='';this.reportPeriod=''},200);
+    },
+    // === 报表 ===
+    async loadTrialBalance() {
+      try {
+        const p = {};
+        if (this.reportYear) p.year = Number(this.reportYear);
+        if (this.reportMonth) p.month = Number(this.reportMonth);
+        const r = await axios.get(apiBase+'/api/accounting/statements/trial-balance',{params:p,headers:authHeader()});
+        if(r.data.code===0) this.trialBalance = r.data.data;
+      } catch(e) { console.error('loadTrialBalance:', e); }
+    },
+    async loadBalanceSheet() {
+      try {
+        const p = {};
+        if (this.reportYear) p.year = Number(this.reportYear);
+        if (this.reportMonth) p.month = Number(this.reportMonth);
+        const r = await axios.get(apiBase+'/api/accounting/statements/balance-sheet',{params:p,headers:authHeader()});
+        if(r.data.code===0) this.balanceSheet = r.data.data;
+      } catch(e) { console.error('loadBalanceSheet:', e); }
+    },
+    async loadIncomeStatement() {
+      try {
+        const p = {};if(this.reportYear)p.year=this.reportYear;if(this.reportMonth)p.month=this.reportMonth;
+        const r = await axios.get(apiBase+'/api/accounting/statements/income-statement',{params:p,headers:authHeader()});
+        if(r.data.code===0) this.incomeStatement = r.data.data;
+        this.reportTitle='利润表';this.reportPeriod=(this.reportYear||'')+'年'+(this.reportMonth?this.reportMonth+'月':'');
+      } catch(e) { console.error(e) }
+    },
+    refreshReport() {
+      if(this.stmtTab==='trial') this.loadTrialBalance();
+      else if(this.stmtTab==='balance') this.loadBalanceSheet();
+      else if(this.stmtTab==='income') this.loadIncomeStatement();
+    },
+    // === 科目 & 账户 ===
+    // 币种
+    async loadCurrencies() { try{const r=await axios.get(apiBase+'/api/accounting/currencies',{headers:authHeader()});if(r.data.code===0)this.currencies=r.data.data}catch(e){} },
+    openCurrencyModal(c) {
+      if(c) this.currencyForm={id:c.id,code:c.code,name:c.name,symbol:c.symbol,rate:c.rate};
+      else this.currencyForm={id:null,code:'',name:'',symbol:'',rate:1};
+      this.showCurrencyModal=true;
+    },
+    async saveCurrency() {
+      try{
+        const d={code:this.currencyForm.code,name:this.currencyForm.name,symbol:this.currencyForm.symbol,rate:Number(this.currencyForm.rate)||1};
+        if(this.currencyForm.id) await axios.put(apiBase+'/api/accounting/currencies/'+this.currencyForm.id,d,{headers:authHeader()});
+        else await axios.post(apiBase+'/api/accounting/currencies',d,{headers:authHeader()});
+        this.showCurrencyModal=false; this.loadCurrencies();
+      }catch(e){alert('保存失败: '+e.message)}
+    },
+    async deleteCurrency(id) {
+      if(!confirm('确定删除该币种?')) return;
+      try{await axios.delete(apiBase+'/api/accounting/currencies/'+id,{headers:authHeader()});this.loadCurrencies()}catch(e){alert('删除失败: '+e.message)}
+    },
+    async loadSubjects() { try{const r=await axios.get(apiBase+'/api/accounting/subjects',{headers:authHeader()});if(r.data.code===0)this.allSubjects=r.data.data}catch(e){} },
+    async loadAccounts() { try{const r=await axios.get(apiBase+'/api/accounting/accounts',{headers:authHeader()});if(r.data.code===0)this.accounts=r.data.data}catch(e){} },
+    openAcctModal(a) {
+      if(a)this.acctForm={id:a.id,name:a.name,type:a.type,balance:a.balance,note:a.note};
+      else this.acctForm={id:null,name:'',type:'bank',balance:0,note:''};
+      this.showAcctModal=true;
+    },
+    async saveAcct() {
+      try {
+        const d={name:this.acctForm.name,type:this.acctForm.type,balance:Number(this.acctForm.balance)||0,note:this.acctForm.note};
+        if(this.acctForm.id)await axios.put(apiBase+'/api/accounting/accounts/'+this.acctForm.id,d,{headers:authHeader()});
+        else await axios.post(apiBase+'/api/accounting/accounts',d,{headers:authHeader()});
+        this.showAcctModal=false;this.loadAccounts();
+      } catch(e){alert('保存失败')}
+      },
+      // ===== 银行对账方法 =====
+      async loadBankStatements(){
+        try{const p=this.bankFilterAccount?'?account_id='+this.bankFilterAccount:'';
+        const r=await axios.get(apiBase+'/api/accounting/bank-statements'+p,{headers:authHeader()});
+        if(r.data.code===0)this.bankStatements=r.data.data;}catch(e){console.error(e);}
+      },
+      handleBankFile(e){
+        const f=e.target.files[0];if(!f)return;const rd=new FileReader();
+        rd.onload=ev=>{this.bankImport.csv_content=ev.target.result;
+        const ls=ev.target.result.split(/[\r\n]+/).filter(l=>l.trim());
+        if(ls.length<2)return;
+        const s=ls[0].includes('\t')?'\t':',';
+        const h=ls[0].split(s).map(x=>x.trim().replace(/[\uFEFF]/g,''));
+        const di=h.findIndex(x=>x.includes('日期')),ei=h.findIndex(x=>x.includes('摘要'));
+        const oi=h.findIndex(x=>x.includes('支出')||x.includes('借方'));
+        const ii=h.findIndex(x=>x.includes('收入')||x.includes('贷方'));
+        const bi=h.findIndex(x=>x.includes('余额'));
+        this.bankImport.preview=ls.slice(1).filter(l=>l.trim()).map(l=>{
+          const c=l.split(s).map(x=>x.trim());
+          return{transaction_date:c[di]||'',description:c[ei]||'',debit_amount:parseFloat(c[oi])||0,credit_amount:parseFloat(c[ii])||0,balance:parseFloat(c[bi])||0};
+        });};rd.readAsText(f);
+      },
+      async uploadBankStatement(){
+        if(!this.bankImport.csv_content)return alert('请选择CSV文件');
+        try{const r=await axios.post(apiBase+'/api/accounting/bank-statements/upload',this.bankImport,{headers:authHeader()});
+        if(r.data.code===0){alert('导入成功');this.showBankImport=false;this.loadBankStatements();}
+        else alert('导入失败: '+r.data.message);
+        this.bankImport={account_id:2,statement_date:'',csv_content:'',preview:[],note:''};
+        }catch(e){alert('导入失败: '+e.message);}
+      },
+      async viewStatement(s){
+        try{const r=await axios.get(apiBase+'/api/accounting/bank-statements/'+s.id,{headers:authHeader()});
+        if(r.data.code===0){this.selectedStatement=r.data.data.statement;this.stmtItems=r.data.data.items;}}catch(e){console.error(e);}
+      },
+      async deleteStatement(id){
+        if(!confirm('确认删除？'))return;
+        try{await axios.delete(apiBase+'/api/accounting/bank-statements/'+id,{headers:authHeader()});
+        this.selectedStatement=null;this.stmtItems=[];this.loadBankStatements();}catch(e){alert(e.message);}
+      },
+      async autoReconcile(id){
+        try{const r=await axios.post(apiBase+'/api/accounting/bank-statements/'+id+'/auto-reconcile',{},{headers:authHeader()});
+        if(r.data.code===0){alert(r.data.message);this.viewStatement(this.selectedStatement);}else alert(r.data.message);}catch(e){alert(e.message);}
+      },
+      openReconcileModal(item){
+        this.reconcileItem=item;this.matchSearch={date:item.transaction_date?.slice(0,10),amount:Number(item.debit_amount||0)+Number(item.credit_amount||0)};
+        this.matchCandidates=[];this.matchVoucher=null;this.showReconcileModal=true;this.searchCandidates();
+      },
+      async searchCandidates(){
+        try{const p=new URLSearchParams();
+        if(this.matchSearch.date)p.set('date',this.matchSearch.date);
+        if(this.matchSearch.amount)p.set('amount',this.matchSearch.amount);
+        const r=await axios.get(apiBase+'/api/accounting/match-candidates?'+p,{headers:authHeader()});
+        if(r.data.code===0)this.matchCandidates=r.data.data;}catch(e){console.error(e);}
+      },
+      async doReconcile(){
+        if(!this.matchVoucher)return;
+        try{const r=await axios.post(apiBase+'/api/accounting/bank-statements/items/'+this.reconcileItem.id+'/reconcile',{voucher_id:this.matchVoucher.id,entry_id:this.matchVoucher.entry_id},{headers:authHeader()});
+        if(r.data.code===0){alert('对账成功');this.showReconcileModal=false;this.viewStatement(this.selectedStatement);}else alert(r.data.message);}catch(e){alert(e.message);}
+      },
+      async unmatchItem(item){
+        if(!confirm('确认取消该条目的对账？'))return;
+        try{const r=await axios.post(apiBase+'/api/accounting/bank-statements/'+this.selectedStatement.id+'/unmatch',{item_id:item.id},{headers:authHeader()});
+        if(r.data.code===0)this.viewStatement(this.selectedStatement);else alert(r.data.message);}catch(e){alert(e.message);}
+      },
+    // ===== 现金流量表 =====
+    async loadCashFlow() {
+      try {
+        if (!this.cashFlowPeriod) {
+          const now = new Date();
+          this.cashFlowPeriod = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+        }
+        const ps = this.cashFlowPeriod.split('-');
+        const r = await axios.get(apiBase+'/api/accounting/statements/cash-flow?year='+ps[0]+'&month='+ps[1], {headers:authHeader()});
+        if (r.data.code===0) this.cashFlow = r.data.data;
+        const now = new Date();
+        const periods = [];
+        for (let i=0; i<12; i++) {
+          const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+          const val = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+          periods.push({value:val, label: val.replace('-','年')+'月'});
+        }
+        this.cashFlowPeriods = periods;
+      } catch(e) { console.error(e); }
+    },
+    exportCashFlow() {
+      if (!this.cashFlowPeriod) return;
+      const ps = this.cashFlowPeriod.split('-');
+      window.open(apiBase+'/api/accounting/statements/cash-flow/export?year='+ps[0]+'&month='+ps[1]+'&token='+localStorage.getItem(tokenKey), '_blank');
+    },
+
+    // ===== 期末结转 =====
+    async loadPeriodCloseStatus() {
+      this.showPeriodClose = true;
+      const now = new Date();
+      const periods = [];
+      for (let i=0; i<12; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+        const val = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+        periods.push({value:val, label: val.replace('-','年')+'月', disabled:false});
+      }
+      this.periodOptions = periods;
+      if (!this.closePeriod) this.closePeriod = periods[0].value;
+      await this.checkCloseStatus();
+    },
+    async checkCloseStatus() {
+      if (!this.closePeriod) return;
+      const ps = this.closePeriod.split('-');
+      try {
+        const r = await axios.get(apiBase+'/api/accounting/period-close/status?year='+ps[0]+'&month='+ps[1], {headers:authHeader()});
+        if (r.data.code===0) Object.assign(this.closeStatus, r.data.data);
+      } catch(e) { console.error(e); }
+    },
+    async doPeriodClose() {
+      if (!confirm('确认执行期末结转？将自动生成结转损益凭证并过账。')) return;
+      const ps = this.closePeriod.split('-');
+      try {
+        const r = await axios.post(apiBase+'/api/accounting/period-close', {year:Number(ps[0]), month:Number(ps[1])}, {headers:authHeader()});
+        if (r.data.code===0) {
+          alert('结转成功！\n凭证号: '+r.data.data.voucher_no+'\n收入: '+r.data.data.revenue_total+'\n费用: '+r.data.data.expense_total+'\n净利润: '+r.data.data.net_profit);
+          this.showPeriodClose = false;
+          this.loadVouchers();
+        } else alert(r.data.message);
+      } catch(e) { alert('结转失败: '+e.message); }
+      this.checkCloseStatus();
+    },
+    async reversePeriodClose() {
+      if (!confirm('确认取消结转？将删除结转凭证。')) return;
+      const ps = this.closePeriod.split('-');
+      try {
+        const r = await axios.post(apiBase+'/api/accounting/period-close/reverse', {year:Number(ps[0]), month:Number(ps[1])}, {headers:authHeader()});
+        if (r.data.code===0) { alert('已取消结转'); this.showPeriodClose = false; this.loadVouchers(); }
+        else alert(r.data.message);
+      } catch(e) { alert('取消失败: '+e.message); }
+      this.checkCloseStatus();
+    },
+
+    // ===== 报表加载 =====
+    async loadStatements() {
+      this.loadTrialBalance();
+      this.loadBalanceSheet();
+      this.loadIncomeStatement();
+    },
+    async loadTrialBalance() {
+      try {
+        const p = {};
+        if (this.reportDate) { const [y,m] = this.reportDate.split('-'); p.year = Number(y); p.month = Number(m); }
+        const r = await axios.get(apiBase+'/api/accounting/statements/trial-balance',{params:p,headers:authHeader()});
+        if(r.data.code===0) { this.trialBalance = r.data.data; }
+      } catch(e) { console.error('loadTrialBalance:', e); }
+    },
+    async loadBalanceSheet() {
+      try {
+        const p = {};
+        if (this.reportYear) p.year = Number(this.reportYear);
+        if (this.reportMonth) p.month = Number(this.reportMonth);
+        const r = await axios.get(apiBase+'/api/accounting/statements/balance-sheet',{params:p,headers:authHeader()});
+        if(r.data.code===0) { this.balanceSheet = r.data.data; }
+      } catch(e) { console.error('loadBalanceSheet:', e); }
+    },
+    async loadIncomeStatement() {
+      try {
+        const p = {};
+        if (this.reportYear) p.year = Number(this.reportYear);
+        if (this.reportMonth) p.month = Number(this.reportMonth);
+        const r = await axios.get(apiBase+'/api/accounting/statements/income-statement',{params:p,headers:authHeader()});
+        if(r.data.code===0) { this.incomeStatement = r.data.data; }
+      } catch(e) { console.error('loadIncomeStatement:', e); }
+    },
+
+    // ========== 账套管理 ==========
+    async loadAccountSets() {
+      try {
+        const r = await axios.get(apiBase+'/api/accounting/account-sets',{headers:authHeader()});
+        if(r.data.code===0) this.accountSets = r.data.data;
+      } catch(e) { console.error('loadAccountSets:', e); }
+    },
+    async loadCurrentAccountSet() {
+      try {
+        const r = await axios.get(apiBase+'/api/accounting/account-set/current',{headers:authHeader()});
+        if(r.data.code===0 && r.data.data) {
+          this.currentAsId = r.data.data.id;
+        }
+        await this.loadAccountSets();
+      } catch(e) { console.error(e); }
+    },
+    async switchAccountSet() {
+      try {
+        const r = await axios.put(apiBase+'/api/accounting/account-set/current',{id:this.currentAsId},{headers:authHeader()});
+        if(r.data.code===0) {
+          document.cookie = 'account_set_id='+this.currentAsId+';path=/;max-age=31536000';
+          // Reload current tab data
+          if(this.tab==='dashboard') this.loadDashboard();
+          else if(this.tab==='vouchers') this.loadVouchers();
+          else if(this.tab==='transactions') this.loadTransactions();
+          else if(this.tab==='subjects') this.loadSubjects();
+          else if(this.tab==='ledgers') this.loadGeneralLedger();
+          else if(this.tab==='statements') this.loadStatements();
+          else if(this.tab==='accounts') this.loadAccounts();
+          alert('账套已切换: '+(this.accountSets.find(a=>a.id===this.currentAsId)||{}).name);
+        }
+      } catch(e) { alert('切换失败: '+e.message); }
+    },
+    editAccountSet(as) {
+      this.editingAsId = as.id;
+      this.asForm = { id:as.id, name:as.name, company:as.company||'', year:as.year, start_date:as.start_date?as.start_date.slice(0,10):'', end_date:as.end_date?as.end_date.slice(0,10):'', currency:as.currency||'CNY' };
+      this.showAsModal = true;
+    },
+    newAccountSet() {
+      this.editingAsId = null;
+      this.asForm = { id:null, name:'', company:'', year:new Date().getFullYear(), start_date:'', end_date:'', currency:'CNY' };
+      this.showAsModal = true;
+    },
+    async saveAccountSet() {
+      const f = this.asForm;
+      if(!f.name||!f.year) return alert('请输入名称和年度');
+      try {
+        if (this.editingAsId) {
+          await axios.put(apiBase+'/api/accounting/account-sets/'+this.editingAsId, f, {headers:authHeader()});
+        } else {
+          await axios.post(apiBase+'/api/accounting/account-sets', f, {headers:authHeader()});
+        }
+        this.showAsModal = false;
+        await this.loadAccountSets();
+      } catch(e) { alert('保存失败: '+e.message); }
+    },
+    async deleteAccountSet(id) {
+      if(!confirm('确定删除该账套？')) return;
+      try {
+        const r = await axios.delete(apiBase+'/api/accounting/account-sets/'+id,{headers:authHeader()});
+        if(r.data.code===0) this.loadAccountSets();
+        else alert(r.data.message);
+      } catch(e) { alert('删除失败: '+e.message); }
+    },
+
+    // ===== AR/AP 应收应付 =====
+    async loadArApSummary() {
+      try { const r = await axios.get(apiBase+'/api/accounting/arap/summary',{headers:authHeader()}); if(r.data.code===0) this.arapSummary=r.data.data; } catch(e) {}
+    },
+    async loadArApAging(type) {
+      this.arapType = type || this.arapType;
+      try {
+        const r = await axios.get(apiBase+'/api/accounting/arap/aging',{params:{type:this.arapType},headers:authHeader()});
+        if(r.data.code===0) this.arapAging = r.data.data;
+      } catch(e) {}
+    },
+// ===== 库存管理 =====
+invCatLabel(cat) {
+  var m = { raw_material:'原材料', semi_finished:'半成品', finished_goods:'产成品', packaging:'包装物', consumable:'低值易耗品' };
+  return m[cat] || cat;
+},
+invTxnTypeLabel(t) {
+  var m = { purchase:'采购入库', production:'生产领用', sale:'销售出库', adjust:'盘点调整', return:'退货', transfer:'调拨' };
+  return m[t] || t;
+},
+fmtQty(v) { var n = Number(v); return isNaN(n) ? '0' : parseFloat(n.toFixed(2)).toString(); },
+async loadInventory() {
+  var params = { pageSize: 200 };
+  if (this.invSearch) params.search = this.invSearch;
+  if (this.invCategoryFilter) params.category = this.invCategoryFilter;
+  try {
+    var r = await axios.get(apiBase + '/api/accounting/inventory-items', { headers: authHeader(), params: params });
+    if (r.data.code === 0) {
+      this.invItems = r.data.data.list || [];
+      // compute summary
+      var items = this.invItems;
+      this.invSummary = {
+        itemCount: items.length,
+        totalValue: items.reduce(function(s,i){return s + (Number(i.current_stock)||0) * (Number(i.unit_price)||0)}, 0),
+        alertCount: items.filter(function(i){return Number(i.current_stock) <= Number(i.safety_stock) && Number(i.current_stock) > 0}).length,
+        zeroStockCount: items.filter(function(i){return Number(i.current_stock) <= 0}).length
+      };
+    }
+  } catch(e) { console.error(e); }
+},
+async loadInvSubjects() {
+  try {
+    var r = await axios.get(apiBase + '/api/accounting/subjects', { headers: authHeader() });
+    if (r.data.code === 0) {
+      this.invSubjects = (r.data.data || []).filter(function(s){
+        return (s.code||'').startsWith('14') || ((s.code||'').startsWith('12') && s.name.indexOf('存货')>=0);
+      });
+    }
+  } catch(e) {}
+},
+openInvForm() {
+  this.invForm = { item_name:'', category:'raw_material', spec:'', unit:'个', unit_price:0, safety_stock:0, subject_id:this.invSubjects.length?this.invSubjects[0].id:'', notes:'' };
+  this.editingInvId = null;
+  this.invShowForm = true;
+},
+editInvItem(item) {
+  this.invForm = {
+    item_name: item.item_name, category: item.category, spec: item.spec||'', unit: item.unit||'个',
+    unit_price: Number(item.unit_price)||0, safety_stock: Number(item.safety_stock)||0,
+    subject_id: item.subject_id, notes: item.notes||''
+  };
+  this.editingInvId = item.id;
+  this.invShowForm = true;
+},
+async saveInvItem() {
+  if (!this.invForm.item_name) { alert('请输入存货名称'); return; }
+  try {
+    var r;
+    if (this.editingInvId) {
+      r = await axios.put(apiBase + '/api/accounting/inventory-items/' + this.editingInvId, this.invForm, { headers: authHeader() });
+    } else {
+      r = await axios.post(apiBase + '/api/accounting/inventory-items', this.invForm, { headers: authHeader() });
+    }
+    if (r.data.code === 0) {
+      this.invShowForm = false;
+      this.loadInventory();
+    } else { alert(r.data.message); }
+  } catch(e) { alert('操作失败: ' + e.message); }
+},
+async deleteInvItem(item) {
+  if (Number(item.current_stock) != 0) { alert('当前库存不为0，无法删除'); return; }
+  if (!confirm('确定停用存货 "' + item.item_name + '"？')) return;
+  try {
+    var r = await axios.delete(apiBase + '/api/accounting/inventory-items/' + item.id, { headers: authHeader() });
+    if (r.data.code === 0) this.loadInventory();
+    else alert(r.data.message);
+  } catch(e) { alert('删除失败: ' + e.message); }
+},
+openStockIn(item) {
+  this.invStockTarget = item;
+  this.invStockForm = { quantity:0, unit_cost: Number(item.unit_price)||0, voucher_date: new Date().toISOString().slice(0,10), batch_no:'', reference:'', notes:'', is_posted:true };
+  this.invStockMsg = '';
+  this.invShowStockIn = true;
+},
+openStockOut(item) {
+  if (Number(item.current_stock) <= 0) { alert('库存为0，无法出库'); return; }
+  this.invStockTarget = item;
+  this.invStockForm = { quantity:0, unit_cost:0, voucher_date: new Date().toISOString().slice(0,10), batch_no:'', reference:'', notes:'', is_posted:true };
+  this.invStockMsg = '';
+  this.invShowStockOut = true;
+},
+async doStockIn() {
+  var f = this.invStockForm;
+  if (!f.quantity || Number(f.quantity) <= 0) { this.invStockMsg = '请输入有效数量'; return; }
+  if (!f.unit_cost || Number(f.unit_cost) <= 0) { this.invStockMsg = '请输入有效单价'; return; }
+  this.invStockMsg = '';
+  try {
+    var r = await axios.post(apiBase + '/api/accounting/inventory/stock-in', {
+      item_id: this.invStockTarget.id, quantity: Number(f.quantity), unit_cost: Number(f.unit_cost),
+      voucher_date: f.voucher_date, batch_no: f.batch_no||null, reference: f.reference||null,
+      notes: f.notes||null, is_posted: f.is_posted
+    }, { headers: authHeader() });
+    if (r.data.code === 0) {
+      this.invStockMsg = '✅ 入库成功' + (r.data.data.voucher_no ? (' 凭证: ' + r.data.data.voucher_no) : '');
+      this.loadInventory();
+    } else { this.invStockMsg = '❌ ' + r.data.message; }
+  } catch(e) { this.invStockMsg = '❌ ' + e.message; }
+},
+async doStockOut() {
+  var f = this.invStockForm;
+  if (!f.quantity || Number(f.quantity) <= 0) { this.invStockMsg = '请输入有效数量'; return; }
+  if (Number(f.quantity) > Number(this.invStockTarget.current_stock)) { this.invStockMsg = '超出库存'; return; }
+  this.invStockMsg = '';
+  try {
+    var r = await axios.post(apiBase + '/api/accounting/inventory/stock-out', {
+      item_id: this.invStockTarget.id, quantity: Number(f.quantity),
+      voucher_date: f.voucher_date, reference: f.reference||null,
+      notes: f.notes||null, is_posted: f.is_posted
+    }, { headers: authHeader() });
+    if (r.data.code === 0) {
+      this.invStockMsg = '✅ 出库成功' + (r.data.data.voucher_no ? (' 凭证: ' + r.data.data.voucher_no) : '');
+      this.loadInventory();
+    } else { this.invStockMsg = '❌ ' + r.data.message; }
+  } catch(e) { this.invStockMsg = '❌ ' + e.message; }
+},
+async loadInvTransactions(item) {
+  this.invTxnItem = item;
+  this.invShowTxn = true;
+  try {
+    var r = await axios.get(apiBase + '/api/accounting/inventory-items/' + item.id, { headers: authHeader() });
+    if (r.data.code === 0) {
+      this.invTxns = r.data.data.transactions || [];
+    }
+  } catch(e) { console.error(e); }
+},
+async loadInvBalance() {
+  this.invShowBalance = true;
+  try {
+    var r = await axios.get(apiBase + '/api/accounting/inventory/balance', {
+      headers: authHeader(),
+      params: { year: this.invBalYear, month: this.invBalMonth }
+    });
+    if (r.data.code === 0) {
+      this.invBalance = r.data.data || [];
+    }
+  } catch(e) { console.error(e); }
+},
+
+
+
+  }
+});
+</script>
+  </div><!-- /#app -->
+</body>
+</html>

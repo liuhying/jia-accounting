@@ -1,0 +1,16 @@
+node_modules/
+.env
+*.bak
+*.bak.*
+*_debug*
+*_test*
+*_diag*
+*_fix*
+*_patch*
+_b3_*
+_b4_*
+_b7_*
+tmp/
+logs/
+.DS_Store
+Thumbs.db
